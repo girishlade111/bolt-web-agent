@@ -73,11 +73,15 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
   const [chatStarted, setChatStarted] = useState(initialMessages.length > 0);
 
   const { showChat } = useStore(chatStore);
+  const selectedModel = useStore(modelStore);
 
   const [animationScope, animate] = useAnimate();
 
   const { messages, isLoading, input, handleInputChange, setInput, stop, append } = useChat({
     api: '/api/chat',
+    body: {
+      model: selectedModel,
+    },
     onError: (error) => {
       logger.error('Request failed\n\n', error);
       toast.error('There was an error processing your request');
@@ -179,7 +183,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
        * manually reset the input and we'd have to manually pass in file attachments. However, those
        * aren't relevant here.
        */
-      append({ role: 'user', content: `${diff}\n\n${_input}` });
+      append({ role: 'user', content: `${diff}\n\n${_input}` }, { body: { model: selectedModel } });
 
       /**
        * After sending a new message we reset all modifications since the model
@@ -187,7 +191,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
        */
       workbenchStore.resetAllFileModifications();
     } else {
-      append({ role: 'user', content: _input });
+      append({ role: 'user', content: _input }, { body: { model: selectedModel } });
     }
 
     setInput('');
@@ -225,10 +229,14 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
         };
       })}
       enhancePrompt={() => {
-        enhancePrompt(input, (input) => {
-          setInput(input);
-          scrollTextArea();
-        });
+        enhancePrompt(
+          input,
+          (input) => {
+            setInput(input);
+            scrollTextArea();
+          },
+          selectedModel,
+        );
       }}
     />
   );
