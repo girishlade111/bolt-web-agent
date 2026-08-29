@@ -12,7 +12,7 @@ export function usePromptEnhancer() {
     setPromptEnhanced(false);
   };
 
-  const enhancePrompt = async (input: string, setInput: (value: string) => void) => {
+  const enhancePrompt = async (input: string, setInput: (value: string) => void, model?: string) => {
     setEnhancingPrompt(true);
     setPromptEnhanced(false);
 
@@ -20,6 +20,7 @@ export function usePromptEnhancer() {
       method: 'POST',
       body: JSON.stringify({
         message: input,
+        model,
       }),
     });
 

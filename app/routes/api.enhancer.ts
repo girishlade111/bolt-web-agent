@@ -11,7 +11,7 @@ export async function action(args: ActionFunctionArgs) {
 }
 
 async function enhancerAction({ context, request }: ActionFunctionArgs) {
-  const { message } = await request.json<{ message: string }>();
+  const { message, model } = await request.json<{ message: string; model?: string }>();
 
   try {
     const result = await streamText(
@@ -30,6 +30,8 @@ async function enhancerAction({ context, request }: ActionFunctionArgs) {
         },
       ],
       context.cloudflare.env,
+      undefined,
+      model,
     );
 
     const transformStream = new TransformStream({
