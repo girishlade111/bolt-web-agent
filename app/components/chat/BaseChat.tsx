@@ -149,14 +149,14 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                       )}
                     </ClientOnly>
 
-                    {/* Toolbar */}
-                    <div className="flex justify-between items-center gap-2 px-3 py-2.5 border-t border-[#2a2a2a] bg-[#161616]">
-                      <div className="flex gap-2 items-center">
+                    {/* Toolbar — allow wrap on narrow screens so input controls don't overflow */}
+                    <div className="flex flex-wrap justify-between items-center gap-2 px-3 py-2.5 border-t border-[#2a2a2a] bg-[#161616]">
+                      <div className="flex gap-2 items-center flex-wrap min-w-0">
                         <IconButton
                           title="Enhance prompt"
                           disabled={input.length === 0 || enhancingPrompt}
                           className={classNames(
-                            'rounded-[6px]! border! px-2.5! py-1! text-xs! font-medium! transition-colors',
+                            'rounded-[6px]! border! px-2.5! py-1! text-xs! font-medium! transition-colors shrink-0',
                             promptEnhanced
                               ? 'bg-[#1c1c1c]! border-[#2a2a2a]! text-[#e07856]!'
                               : 'bg-[#1c1c1c] border-[#2a2a2a] text-[#8a8a8a] hover:text-[#e8e8e8] hover:bg-[#242424]',
@@ -181,7 +181,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                         )}
                       </div>
                       {input.length > 3 ? (
-                        <div className="hidden sm:flex items-center gap-1 text-[11px] text-[#5c5c5c]">
+                        <div className="hidden sm:flex items-center gap-1 text-[11px] text-[#5c5c5c] shrink-0">
                           <span>
                             <kbd className="kdb">Shift</kbd> + <kbd className="kdb">↵</kbd> new line
                           </span>
@@ -194,7 +194,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               </div>
             ) : (
               /* Home page — only the prompt input, vertically + horizontally centered */
-              <div className="w-full max-w-[640px] px-8">
+              <div className="w-full max-w-[640px] px-4 sm:px-8">
                 <div className="relative w-full max-w-chat mx-auto z-prompt">
                   <div className="rounded-[8px] bg-[#161616] border border-[#2a2a2a] overflow-hidden">
                     <textarea
@@ -232,14 +232,14 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                       )}
                     </ClientOnly>
 
-                    {/* Toolbar */}
-                    <div className="flex justify-between items-center gap-2 px-3 py-2.5 border-t border-[#2a2a2a] bg-[#161616]">
-                      <div className="flex gap-2 items-center">
+                    {/* Toolbar — wrap on mobile */}
+                    <div className="flex flex-wrap justify-between items-center gap-2 px-3 py-2.5 border-t border-[#2a2a2a] bg-[#161616]">
+                      <div className="flex gap-2 items-center flex-wrap min-w-0">
                         <IconButton
                           title="Enhance prompt"
                           disabled={input.length === 0 || enhancingPrompt}
                           className={classNames(
-                            'rounded-[6px]! border! px-2.5! py-1! text-xs! font-medium! transition-colors',
+                            'rounded-[6px]! border! px-2.5! py-1! text-xs! font-medium! transition-colors shrink-0',
                             promptEnhanced
                               ? 'bg-[#1c1c1c]! border-[#2a2a2a]! text-[#e07856]!'
                               : 'bg-[#1c1c1c] border-[#2a2a2a] text-[#8a8a8a] hover:text-[#e8e8e8] hover:bg-[#242424]',
@@ -264,7 +264,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                         )}
                       </div>
                       {input.length > 3 ? (
-                        <div className="hidden sm:flex items-center gap-1 text-[11px] text-[#5c5c5c]">
+                        <div className="hidden sm:flex items-center gap-1 text-[11px] text-[#5c5c5c] shrink-0">
                           <span>
                             <kbd className="kdb">Shift</kbd> + <kbd className="kdb">↵</kbd> new line
                           </span>
