@@ -8,7 +8,7 @@ import { classNames } from '~/utils/classNames';
 import { Dialog, DialogRoot, DialogTitle, DialogDescription, DialogButton } from '~/components/ui/Dialog';
 import { getStoredToken, setStoredToken, clearStoredToken, collectFiles, pushToGitHub } from '~/lib/github.client';
 import { downloadProjectZip } from '~/lib/zip-export.client';
-import { getDeployToken, setDeployToken, deployToCloudflare, deployToVercel, deployToNetlify, pollDeploymentStatus, type DeployProvider } from '~/lib/deploy.client';
+import { getDeployToken, setDeployToken as persistDeployToken, deployToCloudflare, deployToVercel, deployToNetlify, pollDeploymentStatus, type DeployProvider } from '~/lib/deploy.client';
 
 interface HeaderActionButtonsProps {}
 
