@@ -44,6 +44,27 @@ export function getSessionHeaders(): Record<string, string> {
  * Ensures HttpOnly bolt_session cookie is still sent via credentials: 'include'.
  */
 export async function fetchWithSession(url: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  // Handle Request object case (useChat may pass Request)
+  if (url instanceof Request) {
+    const headers = new Headers(url.headers);
+    if (cachedSessionId) headers.set('X-Session-Id', cachedSessionId);
+    const req = new Request(url, { ...init as RequestInit, headers, credentials: 'include' as RequestCredentials });
+    const res = await fetch(req);
+    captureSessionIdFromResponse(res);
+    if (!cachedSessionId) {
+      try {
+        const clone = res.clone();
+        const ct = clone.headers.get('Content-Type') || '';
+        if (ct.includes('application/json')) {
+          const data: any = await clone.json().catch(() => null);
+          if (data?.sessionId && isValidSessionId(data.sessionId)) {
+            cachedSessionId = data.sessionId;
+          }
+        }
+      } catch {}
+    }
+    return res;
+  }
   const headers = new Headers(init?.headers as HeadersInit);
   if (cachedSessionId) {
     headers.set('X-Session-Id', cachedSessionId);
