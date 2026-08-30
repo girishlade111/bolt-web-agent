@@ -8,6 +8,7 @@ import { classNames } from '~/utils/classNames';
 import { Messages } from './Messages.client';
 import { SendButton } from './SendButton.client';
 import { ModelSelector } from './ModelSelector';
+import { SupabaseToggle } from './SupabaseToggle';
 
 import styles from './BaseChat.module.scss';
 
@@ -26,6 +27,8 @@ interface BaseChatProps {
   sendMessage?: (event: React.UIEvent, messageInput?: string) => void;
   handleInputChange?: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   enhancePrompt?: () => void;
+  supabaseEnabled?: boolean;
+  onSupabaseToggle?: (enabled: boolean) => void;
 }
 
 const EXAMPLE_PROMPTS = [
