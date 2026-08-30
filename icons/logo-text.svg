@@ -1,15 +1,57 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 32">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 32" width="200" height="32">
   <defs>
-    <linearGradient id="lsTextGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#6366F1"/>
-      <stop offset="100%" stop-color="#06B6D4"/>
+    <linearGradient id="ltIconBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#0f0f1a"/>
     </linearGradient>
+    <linearGradient id="ltAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#38bdf8"/>
+    </linearGradient>
+    <linearGradient id="ltShine" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="ltGlow">
+      <feGaussianBlur stdDeviation="0.8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
-  <!-- LS mark -->
-  <g>
-    <rect x="0" y="2" width="28" height="28" rx="7" fill="url(#lsTextGrad)"/>
-    <path d="M7.5 9H10v7.8h4.8v2.4H7.5V9zm10.8-.2c1.9 0 3.1.8 3.1 2.2 0 1-.5 1.6-1.7 2l-1.5.5c-.7.2-.9.4-.9.8 0 .4.4.7 1.1.7.7 0 1.5-.3 2.2-.8l.8 1.6c-.7.6-1.7 1.1-3 1.1-1.8 0-3-.8-3-2.2 0-1.1.6-1.7 1.9-2.2l1.5-.5c.5-.2.7-.4.7-.7 0-.4-.3-.7-1-.7-.7 0-1.5.3-2.1.7L15 10c.7-.5 1.7-1.2 2.8-1.2z" fill="white"/>
+
+  <!-- Icon mark -->
+  <g transform="translate(2, 2)">
+    <rect width="28" height="28" rx="6" fill="url(#ltIconBg)"/>
+    <rect width="28" height="14" rx="6" fill="url(#ltShine)"/>
+    <rect x="0.5" y="0.5" width="27" height="27" rx="5.5" fill="none" stroke="url(#ltAccent)" stroke-opacity="0.4" stroke-width="0.8"/>
+
+    <!-- L -->
+    <g filter="url(#ltGlow)">
+      <rect x="5" y="6" width="2.4" height="11.5" rx="0.8" fill="url(#ltAccent)"/>
+      <rect x="5" y="15.2" width="7" height="2.4" rx="0.8" fill="url(#ltAccent)"/>
+    </g>
+
+    <!-- S -->
+    <g filter="url(#ltGlow)">
+      <rect x="14" y="6" width="6.5" height="2.2" rx="0.7" fill="url(#ltAccent)"/>
+      <rect x="14" y="12.9" width="6.5" height="2.2" rx="0.7" fill="url(#ltAccent)"/>
+      <rect x="14" y="19.8" width="6.5" height="2.2" rx="0.7" fill="url(#ltAccent)"/>
+      <rect x="14" y="6" width="2.2" height="6.9" rx="0.7" fill="url(#ltAccent)"/>
+      <rect x="18.3" y="12.9" width="2.2" height="9.1" rx="0.7" fill="url(#ltAccent)"/>
+    </g>
   </g>
-  <!-- LS Build wordmark -->
-  <text x="36" y="22" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="18" font-weight="800" letter-spacing="-0.03em" fill="currentColor">LS Build</text>
+
+  <!-- Wordmark -->
+  <text
+    x="38"
+    y="20"
+    font-family="'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif"
+    font-size="14"
+    font-weight="700"
+    letter-spacing="-0.02em"
+    fill="currentColor"
+  >LS Build</text>
 </svg>
