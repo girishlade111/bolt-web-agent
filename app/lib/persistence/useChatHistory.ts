@@ -121,7 +121,7 @@ export function useChatHistory() {
 
     async function load() {
       // 1. Try server first (source of truth for cross-device)
-      const serverChat = await fetchServerChat(mixedId);
+      const serverChat = await fetchServerChat(mixedId!);
 
       if (cancelled) return;
 
@@ -156,7 +156,7 @@ export function useChatHistory() {
       }
 
       try {
-        const storedMessages = await getMessages(db, mixedId);
+        const storedMessages = await getMessages(db, mixedId!);
 
         if (storedMessages && storedMessages.messages.length > 0) {
           setInitialMessages(storedMessages.messages);
