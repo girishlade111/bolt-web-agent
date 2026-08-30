@@ -116,7 +116,7 @@ export async function pollDeploymentStatus(
   const timeout = opts.timeoutMs ?? 60000;
   const start = Date.now();
   while (Date.now() - start < timeout) {
-    const res = await fetchWithSession(`/api/deploy/${provider}/status?deploymentId=${encodeURIComponent(deploymentId)}&projectName=${encodeURIComponent(projectName)}`);
+    const res = await fetchWithSession(`/api/deploy/${provider}?deploymentId=${encodeURIComponent(deploymentId)}&projectName=${encodeURIComponent(projectName)}`);
     const data: any = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error ?? `Status check failed: ${res.status}`);
     if (data.status === 'ready' || data.status === 'success' || data.url) return data as DeployResult;
