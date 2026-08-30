@@ -24,6 +24,7 @@ export async function ensureSupabaseProvisioned(prompt: string, enableSupabase: 
   try {
     const res = await fetch('/api/supabase', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, enableSupabase }),
     });

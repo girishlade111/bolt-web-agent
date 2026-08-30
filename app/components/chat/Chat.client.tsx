@@ -81,6 +81,9 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
 
   const { messages, isLoading, input, handleInputChange, setInput, stop, append } = useChat({
     api: '/api/chat',
+    credentials: 'include' as any,
+    // ensure HttpOnly bolt_session is sent even under strict fetch defaults / CDN edge
+    fetch: ((url, options) => fetch(url, { ...options, credentials: 'include' as any })) as any,
     body: {
       model: selectedModel,
       enableSupabase: supabaseEnabled,

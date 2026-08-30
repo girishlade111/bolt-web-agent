@@ -70,6 +70,7 @@ export async function pushToGitHub(opts: {
 }): Promise<{ repoUrl: string; branch: string; filesPushed: number }> {
   const res = await fetch('/api/github/push', {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(opts),
   });
