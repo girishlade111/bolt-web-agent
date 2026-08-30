@@ -1,10 +1,11 @@
 import type { Message } from 'ai';
-import React, { type RefCallback } from 'react';
+import React, { type RefCallback, useEffect, useState } from 'react';
 import { ClientOnly } from 'remix-utils/client-only';
 import { Menu } from '~/components/sidebar/Menu.client';
 import { IconButton } from '~/components/ui/IconButton';
 import { Workbench } from '~/components/workbench/Workbench.client';
 import { classNames } from '~/utils/classNames';
+import { isMobile } from '~/utils/mobile';
 import { Messages } from './Messages.client';
 import { SendButton } from './SendButton.client';
 import { ModelSelector } from './ModelSelector';
@@ -65,12 +66,24 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     ref,
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
+    const [isMobileView, setIsMobileView] = useState(false);
+
+    useEffect(() => {
+      const check = () => setIsMobileView(isMobile());
+      check();
+      window.addEventListener('resize', check);
+      return () => window.removeEventListener('resize', check);
+    }, []);
+
+    // On mobile, workbench takes full screen — hide chat when workbench open to avoid overflow
+    const mobileWorkbenchOpen = isMobileView && chatStarted;
 
     return (
       <div
         ref={ref}
-        className={classNames(styles.BaseChat, 'relative flex h-full w-full overflow-hidden bg-[#0d0d0d]')}
+        className={classNames(styles.BaseChat, 'relative flex h-full w-full overflow-hidden bg-[#0d0d0d]', isMobileView ? 'is-mobile' : '')}
         data-chat-visible={showChat}
+        data-mobile-workbench={mobileWorkbenchOpen ? 'true' : 'false'}
       >
         <ClientOnly>{() => <Menu />}</ClientOnly>
 

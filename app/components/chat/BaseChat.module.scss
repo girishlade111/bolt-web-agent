@@ -17,3 +17,12 @@
 .Chat {
   opacity: 1;
 }
+
+/* Mobile: when workbench open, hide chat to avoid side-by-side overflow — single-panel toggle */
+@media (max-width: 639px) {
+  .BaseChat[data-mobile-workbench='true'] {
+    .Chat {
+      display: none;
+    }
+  }
+}

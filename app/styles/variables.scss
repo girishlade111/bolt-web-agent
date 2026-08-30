@@ -240,3 +240,14 @@
   --bolt-elements-terminal-color-brightCyan: var(--bolt-terminal-brightCyan);
   --bolt-elements-terminal-color-brightWhite: var(--bolt-terminal-brightWhite);
 }
+
+/* Mobile: prevent fixed 640px overflow — Workbench collapses to toggle, chat is full-width */
+@media (max-width: 639px) {
+  :root {
+    --chat-min-width: 100%;
+    --chat-max-width: 100%;
+    --workbench-width: 100%;
+    --workbench-inner-width: 100%;
+    --workbench-left: 0;
+  }
+}
