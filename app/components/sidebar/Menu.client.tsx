@@ -33,28 +33,68 @@ export function Menu() {
   const [open, setOpen] = useState(false);
   const [dialogContent, setDialogContent] = useState<DialogContent>(null);
 
-  const loadEntries = useCallback(() => {
+  const loadEntries = useCallback(async () => {
+    // Source of truth is server (session_id cookie), IndexedDB is cache/fallback
+    let serverList: ChatHistoryItem[] = [];
+    try {
+      const res = await fetch('/api/chat-history');
+      if (res.ok) {
+        const data: any = await res.json();
+        if (Array.isArray(data.chats)) serverList = data.chats;
+      }
+    } catch {}
+
+    // Merge with IndexedDB cache for offline resilience
+    let localList: ChatHistoryItem[] = [];
     if (db) {
-      getAll(db)
-        .then((list) => list.filter((item) => item.urlId && item.description))
-        .then(setList)
-        .catch((error) => toast.error(error.message));
+      try {
+        localList = await getAll(db).then((l) => l.filter((i) => i.urlId && i.description));
+      } catch {}
     }
+
+    // Merge, server wins on conflict, dedup by id
+    const byId = new Map<string, ChatHistoryItem>();
+    for (const item of [...localList, ...serverList]) byId.set(item.id, item);
+    const merged = Array.from(byId.values()).filter((i) => i.urlId && i.description);
+
+    // Cache server results to IDB for offline
+    if (db && serverList.length) {
+      for (const item of serverList) {
+        try {
+          const { setMessages } = await import('~/lib/persistence/db');
+          await setMessages(db, item.id, item.messages, item.urlId, item.description);
+        } catch {}
+      }
+    }
+
+    setList(merged);
   }, []);
 
   const deleteItem = useCallback((event: React.UIEvent, item: ChatHistoryItem) => {
     event.preventDefault();
-    if (db) {
-      deleteById(db, item.id)
-        .then(() => {
-          loadEntries();
-          if (chatId.get() === item.id) window.location.pathname = '/';
-        })
-        .catch((error) => {
-          toast.error('Failed to delete conversation');
-          logger.error(error);
+    // Optimistic local delete
+    const doDelete = async () => {
+      if (db) {
+        try {
+          await deleteById(db, item.id);
+        } catch {}
+      }
+      try {
+        await fetch('/api/chat-history', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.id }),
         });
-    }
+      } catch (e) {
+        logger.warn('Server delete failed (offline?)', e);
+      }
+      loadEntries();
+      if (chatId.get() === item.id) window.location.pathname = '/';
+    };
+    doDelete().catch((error) => {
+      toast.error('Failed to delete conversation');
+      logger.error(error);
+    });
   }, []);
 
   const closeDialog = () => setDialogContent(null);
