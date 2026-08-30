@@ -59,6 +59,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       handleInputChange,
       enhancePrompt,
       handleStop,
+      supabaseEnabled = false,
+      onSupabaseToggle,
     },
     ref,
   ) => {
