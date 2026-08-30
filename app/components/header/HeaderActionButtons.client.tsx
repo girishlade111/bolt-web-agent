@@ -149,7 +149,7 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
     try {
       // Persist token session-scoped if provided
       if (deployToken.trim()) {
-        await setDeployToken(deployProvider, deployToken.trim(), deployAccountId ? { accountId: deployAccountId.trim() } : undefined);
+        await persistDeployToken(deployProvider, deployToken.trim(), deployAccountId ? { accountId: deployAccountId.trim() } : undefined);
       }
 
       let result: any;
