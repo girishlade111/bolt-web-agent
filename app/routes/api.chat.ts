@@ -12,6 +12,31 @@ export async function action(args: ActionFunctionArgs) {
     return createRateLimitResponse(rateLimit);
   }
 
+  // Auto-provision Supabase if prompt indicates DB need or explicit toggle.
+  // This keeps /api/chat safe to call even when client hasn't pre-provisioned;
+  // the actual .env injection is done client-side via /api/supabase, but we
+  // ensure the project exists session-scoped so LLM can use it.
+  try {
+    const cloned = args.request.clone();
+    const body = (await cloned.json().catch(() => ({}))) as {
+      messages?: Messages;
+      enableSupabase?: boolean;
+    };
+    const lastPrompt = body.messages?.filter((m) => m.role === 'user').slice(-1)[0]?.content ?? '';
+    const explicit = Boolean(body.enableSupabase);
+    if (lastPrompt || explicit) {
+      const { ensureSupabaseProject } = await import('~/lib/.server/supabase');
+      await ensureSupabaseProject({
+        sessionId: rateLimit.sessionId,
+        env: args.context.cloudflare.env as Env,
+        prompt: lastPrompt,
+        explicitToggle: explicit,
+      });
+    }
+  } catch (e) {
+    console.warn('[api.chat] supabase auto-provision check failed', e);
+  }
+
   const response = await chatAction(args);
 
   appendRateLimitHeaders(response, rateLimit);
@@ -20,7 +45,11 @@ export async function action(args: ActionFunctionArgs) {
 }
 
 async function chatAction({ context, request }: ActionFunctionArgs) {
-  const { messages, model } = await request.json<{ messages: Messages; model?: string }>();
+  const { messages, model, enableSupabase } = (await request.json()) as {
+    messages: Messages;
+    model?: string;
+    enableSupabase?: boolean;
+  };
 
   const stream = new SwitchableStream();
 
