@@ -18,12 +18,15 @@ export const NVIDIA_MODELS = [
 ];
 
 export function getNvidiaModel(apiKey: string, modelName: string = DEFAULT_MODEL) {
+  const isSupported = NVIDIA_MODELS.some((m) => m.id === modelName);
+  const targetModel = isSupported ? modelName : DEFAULT_MODEL;
+
   const nvidia = createOpenAI({
     baseURL: 'https://integrate.api.nvidia.com/v1',
     apiKey,
   });
 
-  return nvidia(modelName);
+  return nvidia(targetModel);
 }
 
 export function getModel(apiKey: string, modelName: string = DEFAULT_MODEL) {

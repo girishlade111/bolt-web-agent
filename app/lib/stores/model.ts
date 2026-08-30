@@ -34,6 +34,7 @@ function initStore() {
     if (persistedModel && SUPPORTED_MODELS.some((m) => m.id === persistedModel)) {
       return persistedModel;
     }
+    localStorage.setItem(kModel, DEFAULT_MODEL);
   }
 
   return DEFAULT_MODEL;
