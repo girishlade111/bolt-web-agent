@@ -64,11 +64,11 @@ export async function action({ request }: ActionFunctionArgs) {
   const description = body.description?.slice(0, 350) ?? 'Exported from LS Build — AI Application Builder';
   const isPrivate = Boolean(body.private);
 
-  // Validate token and get user
+  // Validate token and get user — invalid token beyond first attempt blocks core flow → throw to ErrorBoundary
   const userRes = await githubFetch('https://api.github.com/user', token);
   if (!userRes.ok) {
     const errText = await userRes.text().catch(() => '');
-    return json({ error: `GitHub token invalid: ${userRes.status} ${errText.slice(0, 300)}` }, { status: 401 });
+    throw json({ error: `GitHub token invalid: ${userRes.status} ${errText.slice(0, 300)}` }, { status: 401 });
   }
   const user: any = await userRes.json();
   const owner: string = user.login;
@@ -100,14 +100,14 @@ export async function action({ request }: ActionFunctionArgs) {
         repo = await existingRes.json();
         repoHtmlUrl = repo.html_url;
       } else {
-        return json({ error: `Repo "${repoName}" already exists and could not be fetched. Try a different name.` }, { status: 409 });
+        throw json({ error: `Repo "${repoName}" already exists and could not be fetched. Try a different name.` }, { status: 409 });
       }
     } else {
-      return json({ error: `Failed to create repo: ${createRes.status} ${errBody.slice(0, 500)}` }, { status: 400 });
+      throw json({ error: `Failed to create repo: ${createRes.status} ${errBody.slice(0, 500)}` }, { status: 400 });
     }
   } else {
     const errBody = await createRes.text().catch(() => '');
-    return json({ error: `Failed to create repo: ${createRes.status} ${errBody.slice(0, 500)}` }, { status: 400 });
+    throw json({ error: `Failed to create repo: ${createRes.status} ${errBody.slice(0, 500)}` }, { status: 400 });
   }
 
   // Filter files: skip node_modules, .git, and huge files
@@ -234,6 +234,7 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   } catch (e: any) {
     console.error('[github.push] failed', e);
-    return json({ error: e.message?.slice(0, 800) ?? 'Push failed' }, { status: 500 });
+    // Real user impact: push of file tree as initial commit failed (network, quota, GitHub outage) — block core flow
+    throw json({ error: e.message?.slice(0, 800) ?? 'Push failed' }, { status: 500 });
   }
 }
