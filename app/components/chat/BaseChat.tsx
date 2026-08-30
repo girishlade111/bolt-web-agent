@@ -173,27 +173,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
               </div>
             </div>
 
-            {/* Examples — single bordered card with internal dividers (sectioned list) */}
-            {!chatStarted && (
-              <div id="examples" className="w-full max-w-[640px] mx-auto px-8 pb-8">
-                <div className="rounded-[8px] bg-[#161616] border border-[#2a2a2a] overflow-hidden divide-y divide-[#2a2a2a]">
-                  {EXAMPLE_PROMPTS.map((ex, index) => (
-                    <button
-                      key={index}
-                      onClick={(e) => sendMessage?.(e, ex.text)}
-                      className="w-full flex items-center justify-between gap-3 px-4 py-[14px] text-left hover:bg-[#1c1c1c] transition-colors group"
-                    >
-                      <span className="text-[13.5px] font-medium leading-snug text-[#e8e8e8] group-hover:text-[#e8e8e8]">{ex.text}</span>
-                      <span className="i-ph:arrow-right text-[#5c5c5c] group-hover:text-[#8a8a8a] text-sm shrink-0" />
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-3 flex items-center gap-2 text-[11px] text-[#5c5c5c]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#3ecf5e]" />
-                  WebContainers ready • No setup • Private by default
-                </div>
-              </div>
-            )}
           </div>
 
           <ClientOnly>{() => <Workbench chatStarted={chatStarted} isStreaming={isStreaming} />}</ClientOnly>
