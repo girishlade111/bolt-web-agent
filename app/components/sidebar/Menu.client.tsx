@@ -16,7 +16,7 @@ const menuVariants = {
     visibility: 'hidden',
     left: '-150px',
     transition: {
-      duration: 0.2,
+      duration: 0.24,
       ease: cubicEasingFn,
     },
   },
@@ -25,7 +25,7 @@ const menuVariants = {
     visibility: 'initial',
     left: 0,
     transition: {
-      duration: 0.2,
+      duration: 0.24,
       ease: cubicEasingFn,
     },
   },
@@ -50,14 +50,11 @@ export function Menu() {
 
   const deleteItem = useCallback((event: React.UIEvent, item: ChatHistoryItem) => {
     event.preventDefault();
-
     if (db) {
       deleteById(db, item.id)
         .then(() => {
           loadEntries();
-
           if (chatId.get() === item.id) {
-            // hard page navigation to clear the stores
             window.location.pathname = '/';
           }
         })
@@ -68,35 +65,21 @@ export function Menu() {
     }
   }, []);
 
-  const closeDialog = () => {
-    setDialogContent(null);
-  };
+  const closeDialog = () => setDialogContent(null);
 
   useEffect(() => {
-    if (open) {
-      loadEntries();
-    }
+    if (open) loadEntries();
   }, [open]);
 
   useEffect(() => {
     const enterThreshold = 40;
     const exitThreshold = 40;
-
     function onMouseMove(event: MouseEvent) {
-      if (event.pageX < enterThreshold) {
-        setOpen(true);
-      }
-
-      if (menuRef.current && event.clientX > menuRef.current.getBoundingClientRect().right + exitThreshold) {
-        setOpen(false);
-      }
+      if (event.pageX < enterThreshold) setOpen(true);
+      if (menuRef.current && event.clientX > menuRef.current.getBoundingClientRect().right + exitThreshold) setOpen(false);
     }
-
     window.addEventListener('mousemove', onMouseMove);
-
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-    };
+    return () => window.removeEventListener('mousemove', onMouseMove);
   }, []);
 
   return (
@@ -105,26 +88,55 @@ export function Menu() {
       initial="closed"
       animate={open ? 'open' : 'closed'}
       variants={menuVariants}
-      className="flex flex-col side-menu fixed top-0 w-[350px] h-full bg-bolt-elements-background-depth-2 border-r rounded-r-3xl border-bolt-elements-borderColor z-sidebar shadow-xl shadow-bolt-elements-sidebar-dropdownShadow text-sm"
+      className="flex flex-col side-menu fixed top-0 w-[360px] h-full bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 z-sidebar shadow-[0_16px_48px_rgba(15,23,42,0.08),0_4px_16px_rgba(15,23,42,0.04)] dark:shadow-[0_16px_48px_rgba(0,0,0,0.45)] text-sm overflow-hidden"
     >
-      <div className="flex items-center h-[var(--header-height)]">{/* Placeholder */}</div>
+      {/* Header spacer */}
+      <div className="h-[56px] shrink-0 flex items-center px-5 border-b border-slate-100 dark:border-slate-800/80">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-600 to-violet-600 flex items-center justify-center shadow-md">
+            <span className="text-white font-black text-xs tracking-tighter">LS</span>
+          </div>
+          <div>
+            <div className="text-sm font-bold tracking-tight leading-none text-slate-900 dark:text-white">LS Build</div>
+            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 leading-none">History</div>
+          </div>
+        </div>
+        <span className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> {list.length}
+        </span>
+      </div>
+
       <div className="flex-1 flex flex-col h-full w-full overflow-hidden">
         <div className="p-4">
           <a
             href="/"
-            className="flex gap-2 items-center bg-bolt-elements-sidebar-buttonBackgroundDefault text-bolt-elements-sidebar-buttonText hover:bg-bolt-elements-sidebar-buttonBackgroundHover rounded-md p-2 transition-theme"
+            className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-accent-600 to-violet-600 hover:from-accent-500 hover:to-violet-500 text-white rounded-xl px-4 py-2.5 text-sm font-semibold shadow-lg shadow-accent-500/20 hover:shadow-accent-500/30 hover:scale-[1.01] active:scale-[0.99] transition-all"
           >
-            <span className="inline-block i-bolt:chat scale-110" />
-            Start new chat
+            <span className="i-ph:plus-bold text-sm" />
+            New Project
           </a>
+          <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-2">Start a new build — LS Build scaffolds instantly</p>
         </div>
-        <div className="text-bolt-elements-textPrimary font-medium pl-6 pr-5 my-2">Your Chats</div>
-        <div className="flex-1 overflow-scroll pl-4 pr-5 pb-5">
-          {list.length === 0 && <div className="pl-2 text-bolt-elements-textTertiary">No previous conversations</div>}
+
+        <div className="px-5 py-2 flex items-center justify-between">
+          <span className="text-xs font-bold tracking-widest uppercase text-slate-500 dark:text-slate-400">Recent builds</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500">{list.length > 0 ? `${list.length} projects` : ''}</span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto pl-4 pr-3 pb-4 custom-scrollbar">
+          {list.length === 0 && (
+            <div className="mx-2 mt-2 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-6 text-center">
+              <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-3 shadow-sm">
+                <span className="i-ph:clock-counter-clockwise text-slate-400 text-lg" />
+              </div>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">No builds yet</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">Your conversation history will appear here. Start by describing what you want to build.</p>
+            </div>
+          )}
           <DialogRoot open={dialogContent !== null}>
             {binDates(list).map(({ category, items }) => (
               <div key={category} className="mt-4 first:mt-0 space-y-1">
-                <div className="text-bolt-elements-textTertiary sticky top-0 z-1 bg-bolt-elements-background-depth-2 pl-2 pt-2 pb-1">
+                <div className="text-[11px] font-bold tracking-widest uppercase text-slate-400 dark:text-slate-500 sticky top-0 z-1 bg-white dark:bg-slate-950 pl-2 py-1.5">
                   {category}
                 </div>
                 {items.map((item) => (
@@ -135,16 +147,16 @@ export function Menu() {
             <Dialog onBackdrop={closeDialog} onClose={closeDialog}>
               {dialogContent?.type === 'delete' && (
                 <>
-                  <DialogTitle>Delete Chat?</DialogTitle>
+                  <DialogTitle>Delete build?</DialogTitle>
                   <DialogDescription asChild>
                     <div>
                       <p>
                         You are about to delete <strong>{dialogContent.item.description}</strong>.
                       </p>
-                      <p className="mt-1">Are you sure you want to delete this chat?</p>
+                      <p className="mt-1">This action cannot be undone.</p>
                     </div>
                   </DialogDescription>
-                  <div className="px-5 pb-4 bg-bolt-elements-background-depth-2 flex gap-2 justify-end">
+                  <div className="px-5 pb-4 bg-white dark:bg-slate-900 flex gap-2 justify-end">
                     <DialogButton type="secondary" onClick={closeDialog}>
                       Cancel
                     </DialogButton>
@@ -163,8 +175,16 @@ export function Menu() {
             </Dialog>
           </DialogRoot>
         </div>
-        <div className="flex items-center border-t border-bolt-elements-borderColor p-4">
-          <ThemeSwitch className="ml-auto" />
+
+        <div className="border-t border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-900/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <span className="i-ph:buildings text-sm" />
+              LS Build Enterprise
+            </div>
+            <ThemeSwitch className="ml-auto" />
+          </div>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">Enterprise-grade AI builder. WebContainers • Secure • Deploy anywhere.</p>
         </div>
       </div>
     </motion.div>

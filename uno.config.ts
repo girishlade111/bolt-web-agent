@@ -22,30 +22,68 @@ const customIconCollection = iconPaths.reduce(
 const BASE_COLORS = {
   white: '#FFFFFF',
   gray: {
-    50: '#FAFAFA',
-    100: '#F5F5F5',
-    200: '#E5E5E5',
-    300: '#D4D4D4',
-    400: '#A3A3A3',
-    500: '#737373',
-    600: '#525252',
-    700: '#404040',
-    800: '#262626',
-    900: '#171717',
-    950: '#0A0A0A',
+    50: '#F8FAFC',
+    100: '#F1F5F9',
+    200: '#E2E8F0',
+    300: '#CBD5E1',
+    400: '#94A3B8',
+    500: '#64748B',
+    600: '#475569',
+    700: '#334155',
+    800: '#1E293B',
+    900: '#0F172A',
+    950: '#020617',
+  },
+  slate: {
+    50: '#F8FAFC',
+    100: '#F1F5F9',
+    200: '#E2E8F0',
+    300: '#CBD5E1',
+    400: '#94A3B8',
+    500: '#64748B',
+    600: '#475569',
+    700: '#334155',
+    800: '#1E293B',
+    900: '#0F172A',
+    950: '#020617',
   },
   accent: {
-    50: '#EEF9FF',
-    100: '#D8F1FF',
-    200: '#BAE7FF',
-    300: '#8ADAFF',
-    400: '#53C4FF',
-    500: '#2BA6FF',
-    600: '#1488FC',
-    700: '#0D6FE8',
-    800: '#1259BB',
-    900: '#154E93',
-    950: '#122F59',
+    50: '#EEF2FF',
+    100: '#E0E7FF',
+    200: '#C7D2FE',
+    300: '#A5B4FC',
+    400: '#818CF8',
+    500: '#6366F1',
+    600: '#4F46E5',
+    700: '#4338CA',
+    800: '#3730A3',
+    900: '#312E81',
+    950: '#1E1B4B',
+  },
+  ls: {
+    50: '#EEF2FF',
+    100: '#E0E7FF',
+    200: '#C7D2FE',
+    300: '#A5B4FC',
+    400: '#818CF8',
+    500: '#6366F1',
+    600: '#4F46E5',
+    700: '#4338CA',
+    800: '#3730A3',
+    900: '#312E81',
+    950: '#1E1B4B',
+  },
+  cyan: {
+    50: '#ECFEFF',
+    100: '#CFFAFE',
+    200: '#A5F3FC',
+    300: '#67E8F9',
+    400: '#22D3EE',
+    500: '#06B6D4',
+    600: '#0891B2',
+    700: '#0E7490',
+    800: '#155E75',
+    900: '#164E63',
   },
   green: {
     50: '#F0FDF4',
@@ -100,15 +138,21 @@ const COLOR_PRIMITIVES = {
 export default defineConfig({
   shortcuts: {
     'bolt-ease-cubic-bezier': 'ease-[cubic-bezier(0.4,0,0.2,1)]',
+    'ls-ease-spring': 'ease-[cubic-bezier(0.16,1,0.3,1)]',
     'transition-theme': 'transition-[background-color,border-color,color] duration-150 bolt-ease-cubic-bezier',
-    kdb: 'bg-bolt-elements-code-background text-bolt-elements-code-text py-1 px-1.5 rounded-md',
+    'transition-smooth': 'transition-all duration-300 ls-ease-spring',
+    kdb: 'bg-bolt-elements-code-background text-bolt-elements-code-text py-1 px-1.5 rounded-md text-xs font-medium border border-bolt-elements-borderColor',
     'max-w-chat': 'max-w-[var(--chat-max-width)]',
+    'glass-light': 'bg-white/70 backdrop-blur-xl border border-white/20',
+    'glass-dark': 'bg-slate-900/70 backdrop-blur-xl border border-white/10',
+    'ls-gradient': 'bg-gradient-to-r from-accent-500 via-violet-500 to-cyan-500',
+    'ls-gradient-text': 'bg-gradient-to-r from-accent-600 via-violet-600 to-cyan-600 bg-clip-text text-transparent',
+    'ls-card': 'bg-white border border-slate-200/60 rounded-2xl shadow-sm hover:shadow-md transition-smooth',
+    'ls-card-dark': 'dark:bg-slate-900 dark:border-slate-800 dark:hover:border-slate-700',
+    'ls-button-primary': 'bg-gradient-to-r from-accent-600 to-violet-600 text-white shadow-lg shadow-accent-500/25 hover:shadow-xl hover:shadow-accent-500/30 hover:from-accent-500 hover:to-violet-500 transition-smooth',
+    'ls-button-glass': 'bg-white/80 backdrop-blur-md border border-slate-200 hover:bg-white hover:border-slate-300 transition-smooth',
   },
   rules: [
-    /**
-     * This shorthand doesn't exist in Tailwind and we overwrite it to avoid
-     * any conflicts with minified CSS classes.
-     */
     ['b', {}],
   ],
   theme: {
@@ -245,22 +289,6 @@ export default defineConfig({
   ],
 });
 
-/**
- * Generates an alpha palette for a given hex color.
- *
- * @param hex - The hex color code (without alpha) to generate the palette from.
- * @returns An object where keys are opacity percentages and values are hex colors with alpha.
- *
- * Example:
- *
- * ```
- * {
- *   '1': '#FFFFFF03',
- *   '2': '#FFFFFF05',
- *   '3': '#FFFFFF08',
- * }
- * ```
- */
 function generateAlphaPalette(hex: string) {
   return [1, 2, 3, 4, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].reduce(
     (acc, opacity) => {

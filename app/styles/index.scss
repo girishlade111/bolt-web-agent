@@ -11,4 +11,33 @@ html,
 body {
   height: 100%;
   width: 100%;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148,163,184,0.4) transparent;
+}
+
+/* LS Build Enterprise — Global Polish */
+::selection {
+  background: rgba(99, 102, 241, 0.2);
+}
+
+:focus-visible {
+  outline: 2px solid #6366F1;
+  outline-offset: 2px;
+}
+
+/* Smooth theme transition for enterprise */
+html[data-theme] {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Better button affordance */
+button, a {
+  -webkit-tap-highlight-color: transparent;
 }

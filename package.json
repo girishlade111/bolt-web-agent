@@ -1,6 +1,6 @@
 {
-  "name": "bolt",
-  "description": "StackBlitz AI Agent",
+  "name": "ls-build",
+  "description": "LS Build - Enterprise AI Builder",
   "private": true,
   "license": "MIT",
   "packageManager": "pnpm@9.4.0",

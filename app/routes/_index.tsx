@@ -5,7 +5,7 @@ import { Chat } from '~/components/chat/Chat.client';
 import { Header } from '~/components/header/Header';
 
 export const meta: MetaFunction = () => {
-  return [{ title: 'Bolt' }, { name: 'description', content: 'Talk with Bolt, an AI assistant from StackBlitz' }];
+  return [{ title: 'LS Build — Enterprise AI Builder' }, { name: 'description', content: 'LS Build — The enterprise-grade AI builder. Prompt, run, edit and ship production apps in seconds.' }];
 };
 
 export const loader = () => json({});
