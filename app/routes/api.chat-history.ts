@@ -1,0 +1,86 @@
+import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from '@remix-run/cloudflare';
+import { getSessionId, generateSessionId, createSessionCookie } from '~/lib/.server/rate-limiter';
+import {
+  getChatsForSession,
+  getChatForSession,
+  saveChatForSession,
+  deleteChatForSession,
+} from '~/lib/.server/chat-persistence';
+
+// GET /api/chat-history?id=xxx or /api/chat-history -> list
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  const env = context.cloudflare.env as Env;
+  let sessionId = getSessionId(request);
+  if (!sessionId) {
+    // No session yet — return empty, client will use IndexedDB cache
+    return json({ chats: [], sessionId: null });
+  }
+
+  const url = new URL(request.url);
+  const lookupId = url.searchParams.get('id');
+
+  if (lookupId) {
+    const chat = await getChatForSession(sessionId, lookupId, env);
+    if (!chat) return json({ chat: null, sessionId }, { status: 404 });
+    return json({ chat, sessionId });
+  }
+
+  const chats = await getChatsForSession(sessionId, env);
+  return json({ chats, sessionId });
+}
+
+export async function action({ request, context }: ActionFunctionArgs) {
+  const env = context.cloudflare.env as Env;
+  let sessionId = getSessionId(request);
+  let setCookie: string | undefined;
+
+  if (!sessionId) {
+    sessionId = generateSessionId();
+    setCookie = createSessionCookie(sessionId);
+  }
+
+  const method = request.method.toUpperCase();
+
+  if (method === 'POST' || method === 'PUT') {
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch {
+      return json({ error: 'Invalid JSON' }, { status: 400 });
+    }
+
+    const { id, urlId, description, messages, fileSnapshot } = body ?? {};
+
+    if (!id || !Array.isArray(messages)) {
+      return json({ error: 'Missing id or messages[]' }, { status: 400 });
+    }
+
+    const saved = await saveChatForSession(
+      sessionId,
+      { id, urlId, description, messages, fileSnapshot: fileSnapshot ?? null },
+      env,
+    );
+
+    const headers: Record<string, string> = {};
+    if (setCookie) headers['Set-Cookie'] = setCookie;
+
+    return json({ ok: true, chat: saved, sessionId }, { headers });
+  }
+
+  if (method === 'DELETE') {
+    let body: any = {};
+    try {
+      body = await request.json().catch(() => ({}));
+    } catch {}
+    const url = new URL(request.url);
+    const id = body?.id ?? url.searchParams.get('id');
+    if (!id) return json({ error: 'Missing id' }, { status: 400 });
+
+    await deleteChatForSession(sessionId, id, env);
+    const headers: Record<string, string> = {};
+    if (setCookie) headers['Set-Cookie'] = setCookie;
+    return json({ ok: true, sessionId }, { headers });
+  }
+
+  return json({ error: 'Method not allowed' }, { status: 405 });
+}
