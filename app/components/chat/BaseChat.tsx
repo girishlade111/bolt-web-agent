@@ -176,7 +176,6 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             {/* Examples — single bordered card with internal dividers (sectioned list) */}
             {!chatStarted && (
               <div id="examples" className="w-full max-w-[640px] mx-auto px-8 pb-8">
-                <div className="text-[12px] font-normal text-[#8a8a8a] mb-2">Try an example</div>
                 <div className="rounded-[8px] bg-[#161616] border border-[#2a2a2a] overflow-hidden divide-y divide-[#2a2a2a]">
                   {EXAMPLE_PROMPTS.map((ex, index) => (
                     <button
