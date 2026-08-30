@@ -18,6 +18,24 @@ export default defineConfig((config) => {
       nodePolyfills({
         include: ['path', 'buffer'],
       }),
+      // Workaround: in SSR dev mode, `path-browserify` (the browser polyfill for
+      // `node:path`) is a CommonJS file, and Vite's SSR module runner evaluates it
+      // as ESM, which throws `ReferenceError: module is not defined`. Convert its
+      // single CJS export to a real ESM export for SSR only.
+      {
+        name: 'ssr-path-browserify-cjs-fix',
+        enforce: 'pre',
+        transform(code, id, options) {
+          if (options?.ssr && id.includes('path-browserify') && code.includes('module.exports = posix;')) {
+            return {
+              code: code.replace('module.exports = posix;', 'export default posix;'),
+              map: null,
+            };
+          }
+
+          return null;
+        },
+      },
       config.mode !== 'test' && remixCloudflareDevProxy(),
       remixVitePlugin({
         future: {
