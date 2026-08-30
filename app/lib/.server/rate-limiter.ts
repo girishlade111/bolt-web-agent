@@ -82,11 +82,12 @@ export function generateSessionId(): string {
   }
 }
 
-export function createSessionCookie(sessionId: string): string {
-  // Secure + HttpOnly + SameSite=Lax; Max-Age 1 year. Use __Host- semantics via Path=/ and no Domain.
-  // On http localhost Secure cookies are still sent but won't be set over http in some browsers;
-  // we set Secure unconditionally for prod; for local dev it still works in most browsers.
-  return `${SESSION_COOKIE_NAME}=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000; Secure`;
+export function createSessionCookie(sessionId: string, request?: Request): string {
+  const base = `${SESSION_COOKIE_NAME}=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`;
+  const isHttps = request?.url?.startsWith('https://') ?? false;
+  const isProduction = typeof process !== 'undefined' && (process as any).env?.NODE_ENV === 'production';
+  const shouldSecure = isHttps || isProduction;
+  return shouldSecure ? `${base}; Secure` : base;
 }
 
 function sessionBucket(): number {
@@ -215,7 +216,7 @@ export async function checkRateLimit(request: Request, env: RateLimitEnv): Promi
     incrementCounter(env, iKey, iTtl),
   ]);
 
-  const cookieHeader = isNewSession ? createSessionCookie(sessionId) : null;
+  const cookieHeader = isNewSession ? createSessionCookie(sessionId, request) : null;
 
   if (sessionCount > SESSION_LIMIT) {
     return {

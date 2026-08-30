@@ -22,7 +22,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   if (!existing) {
     const sessionId = generateSessionId();
-    const cookieHeader = createSessionCookie(sessionId);
+    const cookieHeader = createSessionCookie(sessionId, request);
 
     return json({}, { headers: { 'Set-Cookie': cookieHeader } });
   }
