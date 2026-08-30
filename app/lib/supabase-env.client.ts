@@ -23,9 +23,8 @@ export async function injectSupabaseEnv(envString: string): Promise<void> {
 
 export async function ensureSupabaseProvisioned(prompt: string, enableSupabase: boolean): Promise<{ provisioned: boolean; envString?: string } | null> {
   try {
-    const res = await fetch('/api/supabase', {
+    const res = await fetchWithSession('/api/supabase', {
       method: 'POST',
-      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt, enableSupabase }),
     });

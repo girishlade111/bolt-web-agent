@@ -6,6 +6,7 @@ import { toast } from 'react-toastify';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { getMessages, getNextId, getUrlId, openDatabase, setMessages } from './db';
 import { webcontainer } from '~/lib/webcontainer';
+import { fetchWithSession } from '~/lib/session.client';
 
 export interface ChatHistoryItem {
   id: string;
@@ -72,8 +73,7 @@ async function restoreFileSnapshot(snapshot: Record<string, string> | null | und
 
 async function fetchServerChat(lookupId: string): Promise<ChatHistoryItem | null> {
   try {
-    const res = await fetch(`/api/chat-history?id=${encodeURIComponent(lookupId)}`, {
-      credentials: 'include',
+    const res = await fetchWithSession(`/api/chat-history?id=${encodeURIComponent(lookupId)}`, {
       headers: { 'Content-Type': 'application/json' },
     });
     if (!res.ok) return null;
