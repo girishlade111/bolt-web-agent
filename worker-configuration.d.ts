@@ -8,6 +8,8 @@ interface Env {
   SUPABASE_PROJECTS_KV?: KVNamespace;
   CHAT_HISTORY_KV?: KVNamespace;
   CHATS_KV?: KVNamespace;
+  DEPLOY_TOKENS_KV?: KVNamespace;
+  DEPLOY_KV?: KVNamespace;
   SUPABASE_ACCESS_TOKEN?: string;
   SUPABASE_MANAGEMENT_TOKEN?: string;
   SUPABASE_ORG_ID?: string;
