@@ -9,8 +9,8 @@ pages_build_output_dir = "./build/client"
 # then replace the ids below. Until then the app falls back to in-memory counters (per-isolate, best-effort).
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
-id = "rate-limit-kv"
-preview_id = "rate-limit-kv-preview"
+id = "00000000000000000000000000000000"
+preview_id = "00000000000000000000000000000000"
 
 # Optional Durable Object alternative (atomic, strongly consistent).
 # Uncomment to use DO instead of / in addition to KV. Requires `wrangler types` after enabling.
