@@ -2,35 +2,95 @@ import { workbenchStore } from '~/lib/stores/workbench';
 import { WORK_DIR } from '~/utils/constants';
 import { fetchWithSession } from '~/lib/session.client';
 
-const TOKEN_KEY = 'github_token';
-const TOKEN_SESSION_KEY = 'github_token_session';
+/**
+ * GitHub OAuth Device Flow client (replaces the PAT-paste flow).
+ * The access token is stored server-side in KV keyed by the bolt_session cookie
+ * (same session util as the rest of the app — fetchWithSession injects X-Session-Id
+ * and captures the bolt_session cookie). Never stored in localStorage/sessionStorage.
+ */
 
-export function getStoredToken(): string | null {
+export interface DeviceFlowStart {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  expiresIn: number;
+  interval: number;
+}
+
+export type DeviceFlowPollResult =
+  | { status: 'ok'; login: string | null }
+  | { status: 'pending' }
+  | { status: 'slow_down' }
+  | { status: 'expired' };
+
+export interface GitHubConnection {
+  hasToken: boolean;
+  login: string | null;
+  token: string | null;
+}
+
+/** Step 1: ask the server to start a device flow (server supplies GITHUB_CLIENT_ID). */
+export async function startDeviceFlow(): Promise<DeviceFlowStart> {
+  const res = await fetchWithSession('/api/github/device', { method: 'POST' });
+  const data: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `Device flow failed to start: ${res.status}`);
+  return data as DeviceFlowStart;
+}
+
+/** Step 2: single poll attempt for the token (server handles GitHub error semantics). */
+export async function pollDeviceFlow(deviceCode: string): Promise<DeviceFlowPollResult> {
+  const res = await fetchWithSession('/api/github/device', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deviceCode }),
+  });
+  const data: any = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `Token poll failed: ${res.status}`);
+  return data as DeviceFlowPollResult;
+}
+
+/**
+ * Full connect loop: start flow, then poll at the GitHub-advised interval until
+ * the user authorizes, the code expires, or the caller aborts via shouldAbort.
+ */
+export async function connectGitHub(opts: {
+  onCode?: (userCode: string, verificationUri: string) => void;
+  shouldAbort?: () => boolean;
+  timeoutMs?: number;
+} = {}): Promise<{ login: string | null }> {
+  const flow = await startDeviceFlow();
+  opts.onCode?.(flow.userCode, flow.verificationUri);
+
+  let interval = Math.max(flow.interval, 5) * 1000;
+  const deadline = Date.now() + (opts.timeoutMs ?? flow.expiresIn * 1000);
+
+  while (Date.now() < deadline) {
+    if (opts.shouldAbort?.()) throw new Error('Connect cancelled');
+    const result = await pollDeviceFlow(flow.deviceCode);
+    if (result.status === 'ok') return { login: result.login };
+    if (result.status === 'slow_down') interval += 5000; // GitHub slow_down guidance
+    if (result.status === 'expired') throw new Error('Device code expired — try connecting again');
+    await new Promise((r) => setTimeout(r, interval));
+  }
+  throw new Error('Timed out waiting for GitHub authorization');
+}
+
+/** Fetch current connection (session-scoped token stored server-side). */
+export async function getGitHubConnection(): Promise<GitHubConnection> {
   try {
-    return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_SESSION_KEY) ?? null;
+    const res = await fetchWithSession('/api/github/device');
+    const data: any = await res.json().catch(() => ({}));
+    return { hasToken: !!data.hasToken, login: data.login ?? null, token: data.token ?? null };
   } catch {
-    return null;
+    return { hasToken: false, login: null, token: null };
   }
 }
 
-export function setStoredToken(token: string, persist: boolean = true): void {
-  try {
-    if (persist) {
-      localStorage.setItem(TOKEN_KEY, token);
-      sessionStorage.removeItem(TOKEN_SESSION_KEY);
-    } else {
-      sessionStorage.setItem(TOKEN_SESSION_KEY, token);
-      // keep localStorage as fallback? clear to avoid confusion
-    }
-  } catch {}
+/** Disconnect: removes the session-scoped token server-side. */
+export async function disconnectGitHub(): Promise<void> {
+  await fetchWithSession('/api/github/device', { method: 'DELETE' });
 }
 
-export function clearStoredToken(): void {
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-    sessionStorage.removeItem(TOKEN_SESSION_KEY);
-  } catch {}
-}
 
 /**
  * Collect WebContainer file tree as {relativePath: content}
@@ -63,7 +123,7 @@ export function collectFiles(): Record<string, string> {
 }
 
 export async function pushToGitHub(opts: {
-  token: string;
+  token?: string; // optional — server falls back to session-connected GitHub token
   repoName: string;
   description?: string;
   private?: boolean;
@@ -81,16 +141,3 @@ export async function pushToGitHub(opts: {
   return data;
 }
 
-// Optional: GitHub OAuth Device Flow helpers (no client_secret needed server-side if proxied)
-// For now we expose a helper that starts device flow if env var is set.
-// If VITE_GITHUB_CLIENT_ID is not configured, UI falls back to PAT.
-export async function startDeviceFlow(clientId?: string) {
-  const cid = clientId ?? (import.meta.env as any).VITE_GITHUB_CLIENT_ID;
-  if (!cid) throw new Error('Device flow not configured — use PAT instead');
-  const res = await fetch('https://github.com/login/device/code', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ client_id: cid, scope: 'repo' }),
-  });
-  return res.json();
-}

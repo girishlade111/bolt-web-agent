@@ -1,12 +1,33 @@
 import { json, type ActionFunctionArgs } from '@remix-run/cloudflare';
+import { getEffectiveSessionId } from '~/lib/.server/rate-limiter';
 
 type GithubPushBody = {
-  token?: string;
+  token?: string; // optional — falls back to session-connected GitHub token (device flow)
   repoName: string;
   description?: string;
   private?: boolean;
   files: Record<string, string>;
 };
+
+function getKv(env: Env): KVNamespace | undefined {
+  const anyEnv = env as any;
+  return anyEnv.DEPLOY_TOKENS_KV ?? anyEnv.DEPLOY_KV ?? anyEnv.SUPABASE_KV ?? anyEnv.RATE_LIMIT_KV;
+}
+
+async function getSessionToken(request: Request, env: Env): Promise<string | null> {
+  const sessionId = getEffectiveSessionId(request);
+  if (!sessionId) return null;
+  const kv = getKv(env);
+  if (!kv) return null;
+  try {
+    const raw = await kv.get(`github:token:${sessionId}`, 'text');
+    if (!raw) return null;
+    return (JSON.parse(raw) as any)?.token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 
 function sanitizeRepoName(name: string): string {
   // GitHub repo name: 1-100 chars, alphanumeric, ., -, _
@@ -38,7 +59,7 @@ async function githubFetch(url: string, token: string, init: RequestInit = {}) {
   return fetch(url, { ...init, headers });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+export async function action({ request, context }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
     return json({ error: 'Method not allowed' }, { status: 405 });
   }
@@ -50,11 +71,14 @@ export async function action({ request }: ActionFunctionArgs) {
     return json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const token = body.token?.trim();
+  // Prefer explicitly supplied token, otherwise use the session-connected (device flow) token
+  const token = body.token?.trim() || (await getSessionToken(request, context.cloudflare.env as Env));
   const repoNameRaw = body.repoName?.trim();
   const files = body.files;
 
-  if (!token) return json({ error: 'Missing GitHub token. Create a PAT with `repo` scope at https://github.com/settings/tokens/new' }, { status: 401 });
+  if (!token) {
+    return json({ error: 'No GitHub account connected. Click "Connect GitHub Account" first (requires GITHUB_CLIENT_ID).' }, { status: 401 });
+  }
   if (!repoNameRaw) return json({ error: 'Missing repoName' }, { status: 400 });
   if (!files || typeof files !== 'object' || Object.keys(files).length === 0) {
     return json({ error: 'No files to push. WebContainer file tree is empty.' }, { status: 400 });

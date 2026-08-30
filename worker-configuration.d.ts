@@ -17,4 +17,5 @@ interface Env {
   CHAT_SUPABASE_URL?: string;
   CHAT_SUPABASE_SERVICE_KEY?: string;
   CHAT_SUPABASE_ANON_KEY?: string;
+  GITHUB_CLIENT_ID?: string;
 }

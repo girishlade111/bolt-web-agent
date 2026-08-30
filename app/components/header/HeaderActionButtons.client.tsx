@@ -1,12 +1,18 @@
 import { useStore } from '@nanostores/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { chatStore } from '~/lib/stores/chat';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
 import { Dialog, DialogRoot, DialogTitle, DialogDescription, DialogButton } from '~/components/ui/Dialog';
-import { getStoredToken, setStoredToken, clearStoredToken, collectFiles, pushToGitHub } from '~/lib/github.client';
+import {
+  connectGitHub,
+  disconnectGitHub,
+  getGitHubConnection,
+  collectFiles,
+  pushToGitHub,
+} from '~/lib/github.client';
 import { downloadProjectZip } from '~/lib/zip-export.client';
 import { getDeployToken, setDeployToken as persistDeployToken, deployToCloudflare, deployToVercel, deployToNetlify, pollDeploymentStatus, type DeployProvider } from '~/lib/deploy.client';
 
@@ -19,15 +25,64 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
   const canHideChat = showWorkbench || !showChat;
 
   const [githubOpen, setGithubOpen] = useState(false);
-  const [token, setToken] = useState('');
   const [repoName, setRepoName] = useState('');
   const [description, setDescription] = useState('Exported from LS Build');
   const [isPrivate, setIsPrivate] = useState(false);
-  const [rememberToken, setRememberToken] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successUrl, setSuccessUrl] = useState<string | null>(null);
   const [zipLoading, setZipLoading] = useState(false);
+
+  // GitHub Device Flow connection states
+  const [ghConnected, setGhConnected] = useState(false);
+  const [ghLogin, setGhLogin] = useState<string | null>(null);
+  const [ghConnecting, setGhConnecting] = useState(false);
+  const [userCode, setUserCode] = useState<string | null>(null);
+  const [verifyUrl, setVerifyUrl] = useState<string | null>(null);
+  const [ghError, setGhError] = useState<string | null>(null);
+  const flowIdRef = useRef(0);
+
+  const handleConnectGitHub = async () => {
+    setGhError(null);
+    setGhConnecting(true);
+    const thisFlow = ++flowIdRef.current;
+    try {
+      const { login } = await connectGitHub({
+        onCode: (code, uri) => {
+          if (flowIdRef.current !== thisFlow) return;
+          setUserCode(code);
+          setVerifyUrl(uri);
+        },
+        shouldAbort: () => flowIdRef.current !== thisFlow,
+      });
+      if (flowIdRef.current !== thisFlow) return;
+      setGhConnected(true);
+      setGhLogin(login);
+      setUserCode(null);
+      setVerifyUrl(null);
+      toast.success(login ? `Connected to GitHub as ${login}` : 'Connected to GitHub');
+    } catch (e: any) {
+      if (flowIdRef.current === thisFlow && e?.message !== 'Connect cancelled') {
+        setGhError(e.message ?? 'Failed to connect GitHub account');
+      }
+      setUserCode(null);
+      setVerifyUrl(null);
+    } finally {
+      if (flowIdRef.current === thisFlow) setGhConnecting(false);
+    }
+  };
+
+  const handleDisconnectGitHub = async () => {
+    setGhError(null);
+    try {
+      await disconnectGitHub();
+      setGhConnected(false);
+      setGhLogin(null);
+      toast.success('Disconnected GitHub account');
+    } catch (e: any) {
+      setGhError(e.message ?? 'Failed to disconnect');
+    }
+  };
 
   // Deploy states
   const [deployOpen, setDeployOpen] = useState(false);
@@ -41,8 +96,11 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
   const [deployStatus, setDeployStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = getStoredToken();
-    if (stored) setToken(stored);
+    // Check for an existing session-connected GitHub account when dialog opens
+    getGitHubConnection().then((conn) => {
+      setGhConnected(conn.hasToken);
+      setGhLogin(conn.login);
+    });
     // suggest repo name from first artifact or timestamp
     const artifact = workbenchStore.firstArtifact;
     if (artifact?.title) {
@@ -74,10 +132,9 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
   const handleExport = async () => {
     setError(null);
     setSuccessUrl(null);
-    const trimmedToken = token.trim();
     const trimmedRepo = repoName.trim();
-    if (!trimmedToken) {
-      setError('GitHub token required. Create a PAT with `repo` scope at github.com/settings/tokens/new');
+    if (!ghConnected) {
+      setError('Connect your GitHub account first using "Connect GitHub Account"');
       return;
     }
     if (!trimmedRepo) {
@@ -91,11 +148,8 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
     }
     setLoading(true);
     try {
-      if (rememberToken) setStoredToken(trimmedToken, true);
-      else setStoredToken(trimmedToken, false);
-
+      // No token in body — server uses the session-connected (device flow) token
       const result = await pushToGitHub({
-        token: trimmedToken,
         repoName: trimmedRepo,
         description,
         private: isPrivate,
@@ -307,35 +361,72 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
               {!successUrl ? (
                 <>
                   <p className="text-[13px] leading-relaxed">
-                    Create a new GitHub repository and push the current WebContainer file tree as the initial commit. Your PAT is stored in <code className="px-1 py-0.5 rounded bg-[#242424] border border-[#2a2a2a]">localStorage</code> for this browser only.
+                    Create a new GitHub repository and push the current WebContainer file tree as the initial commit. Connect once via GitHub OAuth Device Flow — the token is stored server-side, keyed to your <code className="px-1 py-0.5 rounded bg-[#242424] border border-[#2a2a2a]">bolt_session</code> (never in localStorage).
                   </p>
 
                   <div className="space-y-3">
-                    <label className="block">
-                      <span className="text-xs font-medium text-[#e8e8e8]">GitHub Personal Access Token (PAT)</span>
-                      <input
-                        type="password"
-                        value={token}
-                        onChange={(e) => setToken(e.target.value)}
-                        placeholder="ghp_..."
-                        className="mt-1 w-full rounded-md border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 text-sm text-[#e8e8e8] placeholder:text-[#5c5c5c] focus:outline-none focus:border-[#6b6bff]"
-                      />
-                      <span className="mt-1 flex items-center justify-between text-[11px] text-[#8a8a8a]">
-                        <a href="https://github.com/settings/tokens/new?scopes=repo&description=LS%20Build" target="_blank" rel="noreferrer" className="underline hover:text-[#e8e8e8]">
-                          Create token (scope: repo)
-                        </a>
-                        <label className="flex items-center gap-1.5 cursor-pointer">
-                          <input type="checkbox" checked={rememberToken} onChange={(e) => setRememberToken(e.target.checked)} className="rounded" />
-                          Remember
-                        </label>
-                      </span>
-                      {getStoredToken() && (
-                        <button onClick={() => { clearStoredToken(); setToken(''); }} className="mt-1 text-[11px] text-[#e5484d] hover:underline">
-                          Clear stored token
-                        </button>
+                    {/* Connection section — GitHub OAuth Device Flow */}
+                    <div className="rounded-md border border-[#2a2a2a] bg-[#141414] p-3">
+                      {!ghConnected && !ghConnecting && !userCode && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-[#8a8a8a]">GitHub account not connected</span>
+                          <button
+                            onClick={handleConnectGitHub}
+                            className="inline-flex h-[28px] items-center gap-1.5 rounded-[6px] bg-[#24292f] hover:bg-[#2f353d] px-3 text-xs font-medium text-white transition-colors"
+                          >
+                            <div className="i-ph:github-logo text-sm" />
+                            Connect GitHub Account
+                          </button>
+                        </div>
                       )}
-                      <p className="mt-1 text-[11px] text-[#5c5c5c]">Alternative: OAuth device flow — set <code className="px-1 rounded bg-[#242424]">VITE_GITHUB_CLIENT_ID</code> and extend <code className="px-1 rounded bg-[#242424]">/api/github/device</code> (PAT is sufficient for now, no full auth system).</p>
-                    </label>
+
+                      {ghConnecting && userCode && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-[#e8e8e8]">
+                            1. Visit{' '}
+                            <a href={verifyUrl ?? 'https://github.com/login/device'} target="_blank" rel="noreferrer" className="underline text-[#6b6bff] hover:text-[#8a8aff]">
+                              {verifyUrl ?? 'github.com/login/device'}
+                            </a>
+                          </p>
+                          <p className="text-xs text-[#e8e8e8]">2. Enter this code:</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <code className="rounded bg-[#0d0d0d] border border-[#2a2a2a] px-3 py-2 text-lg font-mono tracking-[0.3em] text-[#7fc87f] select-all">
+                              {userCode}
+                            </code>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard?.writeText(userCode).catch(() => {});
+                                toast.success('Code copied');
+                              }}
+                              className="inline-flex h-[28px] items-center rounded-[6px] border border-[#2a2a2a] bg-[#1c1c1c] hover:bg-[#242424] px-3 text-xs text-[#e8e8e8] transition-colors"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                          <p className="flex items-center gap-2 text-[11px] text-[#8a8a8a]">
+                            <div className="i-svg-spinners:90-ring-with-bg text-sm" />
+                            Waiting for authorization…
+                          </p>
+                        </div>
+                      )}
+
+                      {ghConnected && (
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-xs text-[#7fc87f]">
+                            <div className="i-ph:check-circle text-sm" />
+                            Connected{ghLogin ? ` as ${ghLogin}` : ''}
+                          </span>
+                          <button
+                            onClick={handleDisconnectGitHub}
+                            className="inline-flex h-[28px] items-center rounded-[6px] border border-[#e5484d]/40 bg-[#1c1c1c] hover:bg-[#2a1a1a] px-3 text-xs font-medium text-[#ff9a9e] transition-colors"
+                          >
+                            Disconnect
+                          </button>
+                        </div>
+                      )}
+
+                      {ghError && <p className="mt-2 text-[11px] text-[#ff9a9e]">{ghError}</p>}
+                    </div>
 
                     <label className="block">
                       <span className="text-xs font-medium text-[#e8e8e8]">Repository name</span>
@@ -371,7 +462,7 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
                     </DialogButton>
                     <button
                       onClick={handleExport}
-                      disabled={loading}
+                      disabled={loading || !ghConnected}
                       className="inline-flex h-[30px] items-center justify-center rounded-[6px] bg-[#6b6bff] hover:bg-[#5a5aff] disabled:opacity-50 disabled:cursor-not-allowed px-4 text-[13px] font-medium text-white transition-colors"
                     >
                       {loading ? 'Pushing…' : 'Create & Push'}
