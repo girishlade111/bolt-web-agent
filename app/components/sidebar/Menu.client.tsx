@@ -9,6 +9,7 @@ import { cubicEasingFn } from '~/utils/easings';
 import { logger } from '~/utils/logger';
 import { HistoryItem } from './HistoryItem';
 import { binDates } from './date-binning';
+import { fetchWithSession } from '~/lib/session.client';
 
 const menuVariants = {
   closed: {
