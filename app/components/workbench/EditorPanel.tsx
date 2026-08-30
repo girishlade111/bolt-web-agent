@@ -66,7 +66,15 @@ export const EditorPanel = memo(
     const terminalToggledByShortcut = useRef(false);
 
     const [activeTerminal, setActiveTerminal] = useState(0);
-    const [terminalCount, setTerminalCount] = useState(1);
+  const [terminalCount, setTerminalCount] = useState(1);
+  const [isMobileView, setIsMobileView] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobileView(isMobile());
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
     const activeFileSegments = useMemo(() => {
       if (!editorDocument) {
@@ -126,25 +134,29 @@ export const EditorPanel = memo(
       <PanelGroup direction="vertical">
         <Panel defaultSize={showTerminal ? DEFAULT_EDITOR_SIZE : 100} minSize={20}>
           <PanelGroup direction="horizontal">
-            <Panel defaultSize={20} minSize={10} collapsible className="max-sm:hidden">
-              <div className="flex flex-col border-r border-bolt-elements-borderColor h-full">
-                <PanelHeader>
-                  <div className="i-ph:tree-structure-duotone shrink-0" />
-                  Files
-                </PanelHeader>
-                <FileTree
-                  className="h-full"
-                  files={files}
-                  hideRoot
-                  unsavedFiles={unsavedFiles}
-                  rootFolder={WORK_DIR}
-                  selectedFile={selectedFile}
-                  onFileSelect={onFileSelect}
-                />
-              </div>
-            </Panel>
-            <PanelResizeHandle className="max-sm:hidden" />
-            <Panel className="flex flex-col" defaultSize={80} minSize={20}>
+            {!isMobileView && (
+              <>
+                <Panel defaultSize={20} minSize={10} collapsible>
+                  <div className="flex flex-col border-r border-bolt-elements-borderColor h-full">
+                    <PanelHeader>
+                      <div className="i-ph:tree-structure-duotone shrink-0" />
+                      Files
+                    </PanelHeader>
+                    <FileTree
+                      className="h-full"
+                      files={files}
+                      hideRoot
+                      unsavedFiles={unsavedFiles}
+                      rootFolder={WORK_DIR}
+                      selectedFile={selectedFile}
+                      onFileSelect={onFileSelect}
+                    />
+                  </div>
+                </Panel>
+                <PanelResizeHandle />
+              </>
+            )}
+            <Panel className="flex flex-col" defaultSize={isMobileView ? 100 : 80} minSize={20}>
               <PanelHeader className="overflow-x-auto">
                 {activeFileSegments?.length && (
                   <div className="flex items-center flex-1 text-sm">
