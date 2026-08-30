@@ -67,11 +67,19 @@ export async function action({ request, context }: ActionFunctionArgs) {
       return json({ error: 'Missing id or messages[]' }, { status: 400 });
     }
 
-    const saved = await saveChatForSession(
-      sessionId,
-      { id, urlId, description, messages, fileSnapshot: fileSnapshot ?? null },
-      env,
-    );
+    let saved;
+    try {
+      saved = await saveChatForSession(
+        sessionId,
+        { id, urlId, description, messages, fileSnapshot: fileSnapshot ?? null },
+        env,
+      );
+    } catch (e: any) {
+      const headers: Record<string, string> = { 'X-Session-Id': sessionId };
+      if (setCookie) headers['Set-Cookie'] = setCookie;
+      // Real user impact: chat history + file snapshot must survive refresh/device change
+      throw json({ error: e?.message ?? 'Failed to persist chat history', sessionId }, { status: 500, headers });
+    }
 
     const headers: Record<string, string> = { 'X-Session-Id': sessionId };
     if (setCookie) headers['Set-Cookie'] = setCookie;
@@ -88,7 +96,13 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const id = body?.id ?? url.searchParams.get('id');
     if (!id) return json({ error: 'Missing id' }, { status: 400 });
 
-    await deleteChatForSession(sessionId, id, env);
+    try {
+      await deleteChatForSession(sessionId, id, env);
+    } catch (e: any) {
+      const headers: Record<string, string> = { 'X-Session-Id': sessionId };
+      if (setCookie) headers['Set-Cookie'] = setCookie;
+      throw json({ error: e?.message ?? 'Failed to delete chat history', sessionId }, { status: 500, headers });
+    }
     const headers: Record<string, string> = { 'X-Session-Id': sessionId };
     if (setCookie) headers['Set-Cookie'] = setCookie;
     return json({ ok: true, sessionId }, { headers });
