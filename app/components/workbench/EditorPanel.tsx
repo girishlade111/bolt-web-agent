@@ -68,6 +68,7 @@ export const EditorPanel = memo(
     const [activeTerminal, setActiveTerminal] = useState(0);
   const [terminalCount, setTerminalCount] = useState(1);
   const [isMobileView, setIsMobileView] = useState(false);
+  const [mobileFilesOpen, setMobileFilesOpen] = useState(false);
 
   useEffect(() => {
     const check = () => setIsMobileView(isMobile());
