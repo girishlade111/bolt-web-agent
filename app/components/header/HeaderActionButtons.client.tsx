@@ -93,8 +93,8 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex border border-bolt-elements-borderColor rounded-md overflow-hidden">
+    <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+      <div className="flex border border-bolt-elements-borderColor rounded-md overflow-hidden shrink-0">
         <Button
           active={showChat}
           disabled={!canHideChat}
@@ -124,11 +124,11 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
       <button
         onClick={handleDownloadZip}
         disabled={zipLoading}
-        className="inline-flex items-center gap-1.5 rounded-md border border-bolt-elements-borderColor bg-[#1c1c1c] hover:bg-[#242424] disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium text-[#e8e8e8] transition-colors"
+        className="inline-flex items-center gap-1 sm:gap-1.5 rounded-md border border-bolt-elements-borderColor bg-[#1c1c1c] hover:bg-[#242424] disabled:opacity-50 disabled:cursor-not-allowed px-2 sm:px-3 py-1.5 text-xs font-medium text-[#e8e8e8] transition-colors shrink-0"
         title="Download as ZIP: Export the entire in-memory WebContainer project as a .zip archive for local development (excludes node_modules, .git)"
       >
         <div className={zipLoading ? 'i-svg-spinners:90-ring-with-bg text-sm' : 'i-ph:download-simple text-sm'} />
-        {zipLoading ? 'Zipping…' : 'Download ZIP'}
+        <span className="hidden sm:inline">{zipLoading ? 'Zipping…' : 'Download ZIP'}</span>
       </button>
 
       <button
@@ -137,11 +137,11 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
           setSuccessUrl(null);
           setGithubOpen(true);
         }}
-        className="inline-flex items-center gap-1.5 rounded-md border border-bolt-elements-borderColor bg-[#1c1c1c] hover:bg-[#242424] px-3 py-1.5 text-xs font-medium text-[#e8e8e8] transition-colors"
+        className="inline-flex items-center gap-1 sm:gap-1.5 rounded-md border border-bolt-elements-borderColor bg-[#1c1c1c] hover:bg-[#242424] px-2 sm:px-3 py-1.5 text-xs font-medium text-[#e8e8e8] transition-colors shrink-0"
         title="Export current WebContainer files to a new GitHub repo"
       >
         <div className="i-ph:github-logo text-sm" />
-        Export to GitHub
+        <span className="hidden sm:inline">Export to GitHub</span>
       </button>
 
       <DialogRoot open={githubOpen}>
