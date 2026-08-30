@@ -202,7 +202,7 @@ export class ActionRunner {
     try {
       switch (action.type) {
         case 'shell': {
-          await this.#runShellAction(action);
+          await this.#runShellAction(action, actionId);
           break;
         }
         case 'file': {
@@ -220,9 +220,27 @@ export class ActionRunner {
     }
   }
 
-  async #runShellAction(action: ActionState) {
+  async #runShellAction(action: ActionState, actionId?: string) {
     if (action.type !== 'shell') {
       unreachable('Expected shell action');
+    }
+
+    const validation = validateShellCommand(action.content);
+
+    if (!validation.allowed) {
+      const preview = action.content.slice(0, 500);
+      const reason = validation.reason ?? 'blocked by policy';
+      const timestamp = new Date().toISOString();
+
+      logger.warn(`Blocked shell action [${reason}]: ${preview}`);
+      console.warn('[ActionRunner] Blocked shell action', {
+        actionId: actionId ?? 'unknown',
+        reason,
+        timestamp,
+        content: preview,
+      });
+
+      throw new Error(`Blocked by security policy: ${reason}`);
     }
 
     const webcontainer = await this.#webcontainer;
