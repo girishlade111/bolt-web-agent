@@ -83,18 +83,41 @@ export async function action({ request, context }: ActionFunctionArgs) {
   const prompt = body.prompt;
   const force = Boolean(body.force);
 
-  const project = await ensureSupabaseProject({
-    sessionId,
-    env,
-    prompt,
-    explicitToggle,
-    force,
-  });
+  let project: Awaited<ReturnType<typeof ensureSupabaseProject>>;
+  try {
+    project = await ensureSupabaseProject({
+      sessionId: sessionId!,
+      env,
+      prompt,
+      explicitToggle,
+      force,
+    });
+  } catch (e: any) {
+    const headers: Record<string, string> = { 'X-Session-Id': sessionId! };
+    if (setCookie) headers['Set-Cookie'] = setCookie;
+    // Real user impact: explicit provisioning threw (network/Management API quota)
+    throw json(
+      { error: e?.message ?? 'Supabase provisioning failed', provisioned: false, explicitToggle, sessionId },
+      { status: 500, headers },
+    );
+  }
 
-  // Not needed → no provisioning
+  // Not needed → no provisioning (low-stakes, keep as json for toast check)
   if (!project) {
     const headers: Record<string, string> = { 'X-Session-Id': sessionId! };
     if (setCookie) headers['Set-Cookie'] = setCookie;
+    if (explicitToggle) {
+      // User explicitly requested DB but provisioning returned null (e.g., Management API quota, mock failure) — block core flow
+      throw json(
+        {
+          error: 'Supabase provisioning failed: Unable to create project. Check SUPABASE_ACCESS_TOKEN/SUPABASE_ORG_ID and try again.',
+          provisioned: false,
+          explicitToggle,
+          sessionId,
+        },
+        { status: 502, headers },
+      );
+    }
     return json(
       {
         provisioned: false,
