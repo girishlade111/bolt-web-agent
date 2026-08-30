@@ -12,6 +12,13 @@ binding = "RATE_LIMIT_KV"
 id = "00000000000000000000000000000000"
 preview_id = "00000000000000000000000000000000"
 
+# Supabase auto-provisioning — session-scoped projects (MAP to session ID).
+# Create once: `wrangler kv namespace create SUPABASE_KV` and `... --preview`
+[[kv_namespaces]]
+binding = "SUPABASE_KV"
+id = "00000000000000000000000000000001"
+preview_id = "00000000000000000000000000000001"
+
 # Optional Durable Object alternative (atomic, strongly consistent).
 # Uncomment to use DO instead of / in addition to KV. Requires `wrangler types` after enabling.
 # [durable_objects]
