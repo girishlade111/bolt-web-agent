@@ -1,5 +1,6 @@
 import { workbenchStore } from '~/lib/stores/workbench';
 import { WORK_DIR } from '~/utils/constants';
+import { fetchWithSession } from '~/lib/session.client';
 
 const TOKEN_KEY = 'github_token';
 const TOKEN_SESSION_KEY = 'github_token_session';
@@ -68,9 +69,8 @@ export async function pushToGitHub(opts: {
   private?: boolean;
   files: Record<string, string>;
 }): Promise<{ repoUrl: string; branch: string; filesPushed: number }> {
-  const res = await fetch('/api/github/push', {
+  const res = await fetchWithSession('/api/github/push', {
     method: 'POST',
-    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(opts),
   });

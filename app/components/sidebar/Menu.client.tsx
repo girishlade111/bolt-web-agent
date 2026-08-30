@@ -38,7 +38,7 @@ export function Menu() {
     // Source of truth is server (session_id cookie), IndexedDB is cache/fallback
     let serverList: ChatHistoryItem[] = [];
     try {
-      const res = await fetch('/api/chat-history', { credentials: 'include' });
+      const res = await fetchWithSession('/api/chat-history');
       if (res.ok) {
         const data: any = await res.json();
         if (Array.isArray(data.chats)) serverList = data.chats;
@@ -81,9 +81,8 @@ export function Menu() {
         } catch {}
       }
       try {
-        await fetch('/api/chat-history', {
+        await fetchWithSession('/api/chat-history', {
           method: 'DELETE',
-          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: item.id }),
         });

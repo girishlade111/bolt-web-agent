@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createScopedLogger } from '~/utils/logger';
+import { fetchWithSession } from '~/lib/session.client';
 
 const logger = createScopedLogger('usePromptEnhancement');
 
@@ -16,9 +17,8 @@ export function usePromptEnhancer() {
     setEnhancingPrompt(true);
     setPromptEnhanced(false);
 
-    const response = await fetch('/api/enhancer', {
+    const response = await fetchWithSession('/api/enhancer', {
       method: 'POST',
-      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: input,
