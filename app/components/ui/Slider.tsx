@@ -24,7 +24,7 @@ export const Slider = genericMemo(<T,>({ selected, options, setSelected }: Slide
   const isLeftSelected = selected === options.left.value;
 
   return (
-    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-full p-1 border border-slate-200 dark:border-slate-700">
+    <div className="flex items-center gap-0.5 bg-[#161616] border border-[#2a2a2a] rounded-[6px] p-0.5">
       <SliderButton selected={isLeftSelected} setSelected={() => setSelected?.(options.left.value)}>
         {options.left.text}
       </SliderButton>
@@ -46,18 +46,11 @@ const SliderButton = memo(({ selected, children, setSelected }: SliderButtonProp
     <button
       onClick={setSelected}
       className={classNames(
-        'text-xs font-semibold px-3.5 py-1.5 rounded-full relative transition-colors',
-        selected ? 'text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200',
+        'text-[12px] font-medium px-2.5 py-1 rounded-[5px] relative transition-colors',
+        selected ? 'text-[#e8e8e8] bg-[#1c1c1c] border border-[#2a2a2a]' : 'text-[#8a8a8a] hover:text-[#e8e8e8] border border-transparent',
       )}
     >
-      <span className="relative z-10 flex items-center gap-1.5">{children}</span>
-      {selected && (
-        <motion.span
-          layoutId="pill-tab"
-          transition={{ duration: 0.22, ease: cubicEasingFn }}
-          className="absolute inset-0 z-0 bg-gradient-to-r from-accent-600 to-violet-600 rounded-full shadow-sm"
-        />
-      )}
+      <span className="relative z-10">{children}</span>
     </button>
   );
 });

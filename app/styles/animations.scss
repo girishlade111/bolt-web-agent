@@ -48,89 +48,14 @@
   }
 }
 
-/* LS Build — Enterprise Motion System */
-@keyframes lsFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes lsFadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes lsScaleIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes lsShimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes lsFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-
-@keyframes lsPulseGlow {
-  0%, 100% { box-shadow: 0 0 20px rgba(99,102,241,0.15); }
-  50% { box-shadow: 0 0 32px rgba(99,102,241,0.25); }
-}
-
-@keyframes lsGradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-@keyframes lsSpinSlow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.animate-fadeIn { animation: lsFadeIn 0.5s cubic-bezier(0.16,1,0.3,1) both; }
-.animate-fadeInUp { animation: lsFadeInUp 0.6s cubic-bezier(0.16,1,0.3,1) both; }
-.animate-scaleIn { animation: lsScaleIn 0.4s cubic-bezier(0.16,1,0.3,1) both; }
-.animate-float { animation: lsFloat 6s ease-in-out infinite; }
-.animate-pulse-glow { animation: lsPulseGlow 3s ease-in-out infinite; }
-
-/* Stagger children */
-.stagger-1 { animation-delay: 0.05s; }
-.stagger-2 { animation-delay: 0.10s; }
-.stagger-3 { animation-delay: 0.15s; }
-.stagger-4 { animation-delay: 0.20s; }
-.stagger-5 { animation-delay: 0.25s; }
-.stagger-6 { animation-delay: 0.30s; }
-
-/* Glass + glow utilities */
-.ls-glow {
-  position: relative;
-  &::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(135deg, #6366F1, #7C3AED, #06B6D4);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    opacity: 0.2;
-    pointer-events: none;
-  }
-}
-
-/* Custom scrollbar — enterprise minimal */
+/* Quiet dark — minimal motion only */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148,163,184,0.4) transparent;
+  scrollbar-color: #2a2a2a transparent;
   &::-webkit-scrollbar { width: 5px; height: 5px; }
   &::-webkit-scrollbar-thumb {
-    background: rgba(148,163,184,0.35);
+    background: #2a2a2a;
     border-radius: 999px;
-    &:hover { background: rgba(148,163,184,0.55); }
   }
   &::-webkit-scrollbar-track { background: transparent; }
 }

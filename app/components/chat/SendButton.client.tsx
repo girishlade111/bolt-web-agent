@@ -6,26 +6,26 @@ interface SendButtonProps {
   onClick?: (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void;
 }
 
-const customEasingFn = cubicBezier(0.16, 1, 0.3, 1);
+const customEasingFn = cubicBezier(0.4, 0, 0.2, 1);
 
 export function SendButton({ show, isStreaming, onClick }: SendButtonProps) {
   return (
     <AnimatePresence>
       {show ? (
         <motion.button
-          className="absolute flex items-center justify-center top-[14px] right-[14px] w-[38px] h-[38px] rounded-xl bg-gradient-to-br from-accent-600 to-violet-600 text-white shadow-lg shadow-accent-500/25 hover:shadow-xl hover:shadow-accent-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 border border-white/10"
-          transition={{ ease: customEasingFn, duration: 0.25 }}
-          initial={{ opacity: 0, scale: 0.9, y: 6 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 6 }}
+          className="absolute flex items-center justify-center top-[12px] right-[10px] w-[32px] h-[32px] rounded-[6px] bg-[#1c1c1c] border border-[#2a2a2a] text-[#8a8a8a] hover:bg-[#242424] hover:text-[#e8e8e8] hover:border-[#2a2a2a] transition-colors"
+          transition={{ ease: customEasingFn, duration: 0.15 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           onClick={(event) => {
             event.preventDefault();
             onClick?.(event);
           }}
           aria-label={isStreaming ? 'Stop generation' : 'Send message'}
         >
-          <div className="text-[18px] flex items-center justify-center">
-            {!isStreaming ? <div className="i-ph:paper-plane-tilt-fill ml-[1px]" /> : <div className="i-ph:stop-fill" />}
+          <div className="text-[14px] flex items-center justify-center opacity-80">
+            {!isStreaming ? <div className="i-ph:arrow-right" /> : <div className="i-ph:stop" />}
           </div>
         </motion.button>
       ) : null}

@@ -21,28 +21,23 @@ export const Messages = React.forwardRef<HTMLDivElement, MessagesProps>((props: 
             const { role, content } = message;
             const isUserMessage = role === 'user';
             const isFirst = index === 0;
-            const isLast = index === messages.length - 1;
 
             return (
               <div
                 key={index}
-                className={classNames('flex gap-4 p-5 w-full rounded-2xl border transition-all', {
-                  'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm': isUserMessage,
-                  'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800/50': !isUserMessage && (!isStreaming || (isStreaming && !isLast)),
-                  'bg-gradient-to-b from-slate-50 dark:from-slate-900/50 to-transparent border-transparent':
-                    !isUserMessage && isStreaming && isLast,
-                  'mt-4': !isFirst,
+                className={classNames('flex gap-3 w-full rounded-[8px] border bg-[#161616] border-[#2a2a2a] p-4', {
+                  'mt-3': !isFirst,
                 })}
               >
                 <div
                   className={classNames(
-                    'flex items-center justify-center w-8 h-8 rounded-xl shrink-0 self-start shadow-sm border',
+                    'flex items-center justify-center w-7 h-7 rounded-[6px] shrink-0 self-start border text-xs',
                     isUserMessage
-                      ? 'bg-gradient-to-br from-accent-600 to-violet-600 text-white border-white/20'
-                      : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700',
+                      ? 'bg-[#1c1c1c] border-[#2a2a2a] text-[#8a8a8a]'
+                      : 'bg-[#1c1c1c] border-[#2a2a2a] text-[#e07856]',
                   )}
                 >
-                  <div className={classNames('text-sm', isUserMessage ? 'i-ph:user-fill' : 'i-ph:sparkle-fill')} />
+                  <div className={classNames('text-xs opacity-70', isUserMessage ? 'i-ph:user' : 'i-ph:sparkle')} />
                 </div>
                 <div className="grid grid-col-1 w-full min-w-0">
                   {isUserMessage ? <UserMessage content={content} /> : <AssistantMessage content={content} />}
@@ -51,14 +46,7 @@ export const Messages = React.forwardRef<HTMLDivElement, MessagesProps>((props: 
             );
           })
         : null}
-      {isStreaming && (
-        <div className="flex items-center justify-center gap-2 mt-6">
-          <span className="w-2 h-2 rounded-full bg-accent-500 animate-bounce [animation-delay:-0.3s]" />
-          <span className="w-2 h-2 rounded-full bg-violet-500 animate-bounce [animation-delay:-0.15s]" />
-          <span className="w-2 h-2 rounded-full bg-cyan-500 animate-bounce" />
-          <span className="ml-2 text-xs font-medium tracking-wide text-slate-500 dark:text-slate-400">LS Build is building…</span>
-        </div>
-      )}
+      {isStreaming && <div className="mt-3 text-[12px] text-[#8a8a8a] flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-[#e07856] animate-pulse" /> LS Build is thinking…</div>}
     </div>
   );
 });
