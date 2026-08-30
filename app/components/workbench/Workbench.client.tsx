@@ -84,6 +84,55 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
     workbenchStore.resetCurrentDocument();
   }, []);
 
+  if (!chatStarted) return null;
+
+  // Mobile: single-panel toggle (no side-by-side, no resizable overflow)
+  if (isMobileView) {
+    return showWorkbench ? (
+      <div className="fixed inset-0 top-[56px] z-30 flex flex-col bg-[#0d0d0d] border-t border-[#2a2a2a]">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-[#2a2a2a] bg-[#0d0d0d]">
+          <Slider selected={selectedView} options={sliderOptions} setSelected={setSelectedView} />
+          <div className="ml-auto flex items-center gap-1.5">
+            {selectedView === 'code' && (
+              <PanelHeaderButton
+                className="text-xs! px-2.5! py-1! rounded-[6px]! bg-[#1c1c1c] border border-[#2a2a2a] text-[#8a8a8a] hover:bg-[#242424] hover:text-[#e8e8e8]"
+                onClick={() => workbenchStore.toggleTerminal(!workbenchStore.showTerminal.get())}
+              >
+                <span className="i-ph:terminal text-xs opacity-60" />
+                Terminal
+              </PanelHeaderButton>
+            )}
+            <IconButton
+              icon="i-ph:x"
+              className="rounded-[6px]! bg-[#1c1c1c] border border-[#2a2a2a] text-[#8a8a8a] hover:bg-[#242424] hover:text-[#e8e8e8]"
+              size="sm"
+              onClick={() => workbenchStore.showWorkbench.set(false)}
+            />
+          </div>
+        </div>
+        <div className="flex-1 overflow-hidden bg-[#0d0d0d] relative">
+          <View initial={{ x: selectedView === 'code' ? 0 : '-100%' }} animate={{ x: selectedView === 'code' ? 0 : '-100%' }}>
+            <EditorPanel
+              editorDocument={currentDocument}
+              isStreaming={isStreaming}
+              selectedFile={selectedFile}
+              files={files}
+              unsavedFiles={unsavedFiles}
+              onFileSelect={onFileSelect}
+              onEditorScroll={onEditorScroll}
+              onEditorChange={onEditorChange}
+              onFileSave={onFileSave}
+              onFileReset={onFileReset}
+            />
+          </View>
+          <View initial={{ x: selectedView === 'preview' ? 0 : '100%' }} animate={{ x: selectedView === 'preview' ? 0 : '100%' }}>
+            <Preview />
+          </View>
+        </div>
+      </div>
+    ) : null;
+  }
+
   return (
     chatStarted && (
       <motion.div initial="closed" animate={showWorkbench ? 'open' : 'closed'} variants={workbenchVariants} className="z-workbench">
