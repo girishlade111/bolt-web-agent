@@ -3,9 +3,20 @@ import { MAX_RESPONSE_SEGMENTS, MAX_TOKENS } from '~/lib/.server/llm/constants';
 import { CONTINUE_PROMPT } from '~/lib/.server/llm/prompts';
 import { streamText, type Messages, type StreamingOptions } from '~/lib/.server/llm/stream-text';
 import SwitchableStream from '~/lib/.server/llm/switchable-stream';
+import { appendRateLimitHeaders, checkRateLimit, createRateLimitResponse } from '~/lib/.server/rate-limiter';
 
 export async function action(args: ActionFunctionArgs) {
-  return chatAction(args);
+  const rateLimit = await checkRateLimit(args.request, args.context.cloudflare.env as any);
+
+  if (!rateLimit.allowed) {
+    return createRateLimitResponse(rateLimit);
+  }
+
+  const response = await chatAction(args);
+
+  appendRateLimitHeaders(response, rateLimit);
+
+  return response;
 }
 
 async function chatAction({ context, request }: ActionFunctionArgs) {
