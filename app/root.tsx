@@ -15,6 +15,21 @@ import xtermStyles from '@xterm/xterm/css/xterm.css?url';
 
 import 'virtual:uno.css';
 
+export async function loader({ request }: LoaderFunctionArgs) {
+  // Set random session ID cookie on first visit so session-based rate limiting
+  // works even before the first /api/chat or /api/enhancer call.
+  const existing = getSessionId(request);
+
+  if (!existing) {
+    const sessionId = generateSessionId();
+    const cookieHeader = createSessionCookie(sessionId);
+
+    return json({}, { headers: { 'Set-Cookie': cookieHeader } });
+  }
+
+  return json({});
+}
+
 export const links: LinksFunction = () => [
   {
     rel: 'icon',
