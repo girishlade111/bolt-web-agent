@@ -6,6 +6,7 @@ import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
 import { Dialog, DialogRoot, DialogTitle, DialogDescription, DialogButton } from '~/components/ui/Dialog';
 import { getStoredToken, setStoredToken, clearStoredToken, collectFiles, pushToGitHub } from '~/lib/github.client';
+import { downloadProjectZip } from '~/lib/zip-export.client';
 
 interface HeaderActionButtonsProps {}
 
@@ -24,6 +25,7 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successUrl, setSuccessUrl] = useState<string | null>(null);
+  const [zipLoading, setZipLoading] = useState(false);
 
   useEffect(() => {
     const stored = getStoredToken();
@@ -77,6 +79,19 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
     }
   };
 
+  const handleDownloadZip = async () => {
+    if (zipLoading) return;
+    setZipLoading(true);
+    try {
+      const filename = await downloadProjectZip();
+      toast.success(`Downloaded ${filename}`);
+    } catch (e: any) {
+      toast.error(e.message ?? 'Failed to create ZIP');
+    } finally {
+      setZipLoading(false);
+    }
+  };
+
   return (
     <div className="flex items-center gap-2">
       <div className="flex border border-bolt-elements-borderColor rounded-md overflow-hidden">
@@ -105,6 +120,16 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
           <div className="i-ph:code-bold" />
         </Button>
       </div>
+
+      <button
+        onClick={handleDownloadZip}
+        disabled={zipLoading}
+        className="inline-flex items-center gap-1.5 rounded-md border border-bolt-elements-borderColor bg-[#1c1c1c] hover:bg-[#242424] disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 text-xs font-medium text-[#e8e8e8] transition-colors"
+        title="Download as ZIP: Export the entire in-memory WebContainer project as a .zip archive for local development (excludes node_modules, .git)"
+      >
+        <div className={zipLoading ? 'i-svg-spinners:90-ring-with-bg text-sm' : 'i-ph:download-simple text-sm'} />
+        {zipLoading ? 'Zipping…' : 'Download ZIP'}
+      </button>
 
       <button
         onClick={() => {
