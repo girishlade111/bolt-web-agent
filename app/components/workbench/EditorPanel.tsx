@@ -159,31 +159,60 @@ export const EditorPanel = memo(
             )}
             <Panel className="flex flex-col" defaultSize={isMobileView ? 100 : 80} minSize={20}>
               <PanelHeader className="overflow-x-auto">
-                {activeFileSegments?.length && (
-                  <div className="flex items-center flex-1 text-sm">
-                    <FileBreadcrumb pathSegments={activeFileSegments} files={files} onFileSelect={onFileSelect} />
-                    {activeFileUnsaved && (
-                      <div className="flex gap-1 ml-auto -mr-1.5">
-                        <PanelHeaderButton onClick={onFileSave}>
-                          <div className="i-ph:floppy-disk-duotone" />
-                          Save
-                        </PanelHeaderButton>
-                        <PanelHeaderButton onClick={onFileReset}>
-                          <div className="i-ph:clock-counter-clockwise-duotone" />
-                          Reset
-                        </PanelHeaderButton>
-                      </div>
-                    )}
+                <div className="flex items-center gap-2 flex-1 text-sm min-w-0">
+                  {isMobileView && (
+                    <IconButton
+                      icon="i-ph:tree-structure"
+                      title={mobileFilesOpen ? 'Hide files' : 'Show files'}
+                      size="sm"
+                      className={mobileFilesOpen ? 'bg-[#242424]! text-[#e8e8e8]!' : ''}
+                      onClick={() => setMobileFilesOpen(!mobileFilesOpen)}
+                    />
+                  )}
+                  {activeFileSegments?.length ? (
+                    <div className="flex items-center flex-1 text-sm min-w-0">
+                      <FileBreadcrumb pathSegments={activeFileSegments} files={files} onFileSelect={onFileSelect} />
+                      {activeFileUnsaved && (
+                        <div className="flex gap-1 ml-auto -mr-1.5 shrink-0">
+                          <PanelHeaderButton onClick={onFileSave}>
+                            <div className="i-ph:floppy-disk-duotone" />
+                            Save
+                          </PanelHeaderButton>
+                          <PanelHeaderButton onClick={onFileReset}>
+                            <div className="i-ph:clock-counter-clockwise-duotone" />
+                            Reset
+                          </PanelHeaderButton>
+                        </div>
+                      )}
+                    </div>
+                  ) : isMobileView ? (
+                    <span className="text-xs text-[#5c5c5c] truncate">No file open</span>
+                  ) : null}
+                </div>
+              </PanelHeader>
+              <div className="h-full flex-1 overflow-hidden relative">
+                {isMobileView && mobileFilesOpen && (
+                  <div className="absolute inset-0 z-10 bg-[#0d0d0d] flex flex-col border-b border-[#2a2a2a]">
+                    <FileTree
+                      className="h-full"
+                      files={files}
+                      hideRoot
+                      unsavedFiles={unsavedFiles}
+                      rootFolder={WORK_DIR}
+                      selectedFile={selectedFile}
+                      onFileSelect={(p) => {
+                        onFileSelect?.(p);
+                        setMobileFilesOpen(false);
+                      }}
+                    />
                   </div>
                 )}
-              </PanelHeader>
-              <div className="h-full flex-1 overflow-hidden">
                 <CodeMirrorEditor
                   theme={theme}
                   editable={!isStreaming && editorDocument !== undefined}
                   settings={editorSettings}
                   doc={editorDocument}
-                  autoFocusOnDocumentChange={!isMobile()}
+                  autoFocusOnDocumentChange={!isMobile() || !isMobileView}
                   onScroll={onEditorScroll}
                   onChange={onEditorChange}
                   onSave={onFileSave}

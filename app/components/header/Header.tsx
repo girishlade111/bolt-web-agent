@@ -56,7 +56,7 @@ export function Header() {
             </g>
             <circle cx="29.5" cy="29.5" r="1.2" fill="#38bdf8" opacity="0.8"/>
           </svg>
-          <div className="hidden xs:flex sm:flex flex-col">
+          <div className="hidden sm:flex flex-col">
             <span className="text-[13px] sm:text-[13.5px] font-semibold leading-none tracking-tight text-[#e8e8e8]">LS Build</span>
             <span className="hidden sm:block text-[11px] leading-none text-[#8a8a8a] mt-0.5">AI Application Builder</span>
           </div>
