@@ -30,7 +30,7 @@ export const BLOCKED_SHELL_PATTERNS: Array<{ pattern: RegExp; reason: string }> 
 
   // fork bombs
   { pattern: /:\(\)\s*\{\s*:\|\s*:&\s*;\s*\}\s*;\s*:/, reason: 'fork bomb :(){ :|:& };:' },
-  { pattern: /:\(\)\s*\{[^}]*:\s*\|\s*:&\s*;/, reason: 'potential fork bomb definition' },
+  { pattern: /:\(\)\s*\{/, reason: 'potential fork bomb definition :(){}' },
 
   // infinite loops in shell / npm scripts
   { pattern: /\bwhile\s+true\b/i, reason: 'infinite loop while true' },
