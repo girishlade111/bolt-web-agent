@@ -5,7 +5,9 @@ import { Menu } from '~/components/sidebar/Menu.client';
 import { IconButton } from '~/components/ui/IconButton';
 import { Workbench } from '~/components/workbench/Workbench.client';
 import { classNames } from '~/utils/classNames';
+import { useStore } from '@nanostores/react';
 import { isMobile } from '~/utils/mobile';
+import { workbenchStore } from '~/lib/stores/workbench';
 import { Messages } from './Messages.client';
 import { SendButton } from './SendButton.client';
 import { ModelSelector } from './ModelSelector';
@@ -67,6 +69,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
   ) => {
     const TEXTAREA_MAX_HEIGHT = chatStarted ? 400 : 200;
     const [isMobileView, setIsMobileView] = useState(false);
+    const showWorkbench = useStore(workbenchStore.showWorkbench);
 
     useEffect(() => {
       const check = () => setIsMobileView(isMobile());
@@ -75,8 +78,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       return () => window.removeEventListener('resize', check);
     }, []);
 
-    // On mobile, workbench takes full screen — hide chat when workbench open to avoid overflow
-    const mobileWorkbenchOpen = isMobileView && chatStarted;
+    // On mobile, workbench takes full screen — hide chat when workbench open to avoid overflow (single-panel toggle)
+    const mobileWorkbenchOpen = isMobileView && chatStarted && showWorkbench;
 
     return (
       <div
@@ -96,7 +99,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
             )}
           >
             {chatStarted ? (
-              <div className="px-8 h-full flex flex-col">
+              <div className="px-3 sm:px-8 h-full flex flex-col">
                 <ClientOnly>
                   {() => (
                     <Messages
@@ -108,8 +111,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   )}
                 </ClientOnly>
 
-                {/* Prompt — sticky at bottom when chat started */}
-                <div className="relative w-full max-w-chat mx-auto z-prompt sticky bottom-0">
+                {/* Prompt — sticky at bottom when chat started — ensure not obscured on mobile */}
+                <div className="relative w-full max-w-chat mx-auto z-prompt sticky bottom-0 pb-[env(safe-area-inset-bottom)]">
                   <div className="rounded-[8px] bg-[#161616] border border-[#2a2a2a] overflow-hidden">
                     <textarea
                       ref={textareaRef}
