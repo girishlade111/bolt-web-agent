@@ -3,44 +3,27 @@ import { atom } from 'nanostores';
 export interface ModelInfo {
   id: string;
   label: string;
-  provider: 'Qwen' | 'DeepSeek' | 'Kimi' | 'GLM' | 'MiniMax' | 'Meta' | 'NVIDIA';
+  provider: 'NVIDIA' | 'Meta' | 'Poolside';
   badge?: string;
 }
 
 export const SUPPORTED_MODELS: ModelInfo[] = [
-  // Qwen Series
-  { id: 'qwen/qwen2.5-coder-32b-instruct', label: 'Qwen 2.5 Coder 32B', provider: 'Qwen', badge: 'Top Coder' },
-  { id: 'qwen/qwen2.5-72b-instruct', label: 'Qwen 2.5 72B', provider: 'Qwen', badge: 'Flagship' },
-  { id: 'qwen/qwq-32b', label: 'QwQ 32B Reasoning', provider: 'Qwen', badge: 'Reasoning' },
+  // NVIDIA Nemotron Series
+  { id: 'nvidia/nemotron-3.5-lightning-30b-a3b', label: 'Nemotron 3.5 Lightning 30B', provider: 'NVIDIA', badge: 'Recommended' },
+  { id: 'nvidia/nemotron-3-nano-30b-a3b', label: 'Nemotron 3 Nano 30B', provider: 'NVIDIA', badge: 'Fast' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b', label: 'Nemotron 3 Super 120B', provider: 'NVIDIA', badge: 'Reasoning' },
+  { id: 'nvidia/nemotron-3-ultra-550b-a55b', label: 'Nemotron 3 Ultra 550B', provider: 'NVIDIA', badge: 'Flagship' },
+  { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning', label: 'Nemotron Nano Omni', provider: 'NVIDIA', badge: 'Reasoning' },
 
-  // DeepSeek Series
-  { id: 'deepseek-ai/deepseek-r1', label: 'DeepSeek R1', provider: 'DeepSeek', badge: 'Reasoning' },
-  { id: 'deepseek-ai/deepseek-v3', label: 'DeepSeek V3', provider: 'DeepSeek', badge: 'Flagship' },
-  { id: 'deepseek-ai/deepseek-r1-distill-qwen-32b', label: 'DeepSeek R1 Distill Qwen 32B', provider: 'DeepSeek', badge: 'Fast Code' },
-  { id: 'deepseek-ai/deepseek-r1-distill-llama-70b', label: 'DeepSeek R1 Distill Llama 70B', provider: 'DeepSeek' },
+  // Meta Series
+  { id: 'meta/llama-3.2-11b-vision-instruct', label: 'Llama 3.2 11B Vision', provider: 'Meta', badge: 'Vision' },
+  { id: 'meta/llama-3.2-90b-vision-instruct', label: 'Llama 3.2 90B Vision', provider: 'Meta', badge: 'Flagship Vision' },
 
-  // Kimi (Moonshot AI)
-  { id: 'moonshotai/moonshot-v1-8k', label: 'Kimi Moonshot 8K', provider: 'Kimi' },
-  { id: 'moonshotai/moonshot-v1-32k', label: 'Kimi Moonshot 32K', provider: 'Kimi' },
-  { id: 'moonshotai/moonshot-v1-128k', label: 'Kimi Moonshot 128K', provider: 'Kimi', badge: 'Long Context' },
-  { id: 'moonshotai/kimi-k3', label: 'Kimi K3', provider: 'Kimi', badge: 'New' },
-
-  // GLM (Zhipu AI)
-  { id: 'thudm/glm-4-9b-chat', label: 'GLM-4 9B Chat', provider: 'GLM' },
-  { id: 'zhipuai/glm-4-9b-chat', label: 'Zhipu GLM-4 9B', provider: 'GLM' },
-  { id: 'zhipuai/glm-5', label: 'Zhipu GLM 5', provider: 'GLM', badge: 'New' },
-
-  // MiniMax
-  { id: 'minimax/minimax-01', label: 'MiniMax 01', provider: 'MiniMax' },
-  { id: 'minimax/abab6.5s-chat', label: 'MiniMax abab 6.5s', provider: 'MiniMax' },
-  { id: 'minimax/minimax-m3', label: 'MiniMax M3', provider: 'MiniMax', badge: 'Multimodal' },
-
-  // Meta & NVIDIA Flagship
-  { id: 'meta/llama-3.3-70b-instruct', label: 'Llama 3.3 70B Instruct', provider: 'Meta', badge: 'Popular' },
-  { id: 'nvidia/llama-3.1-nemotron-70b-instruct', label: 'Nemotron 70B Instruct', provider: 'NVIDIA' },
+  // Poolside Series
+  { id: 'poolside/laguna-xs-2.1', label: 'Laguna XS 2.1', provider: 'Poolside', badge: 'Coder' },
 ];
 
-export const DEFAULT_MODEL = 'qwen/qwen2.5-coder-32b-instruct';
+export const DEFAULT_MODEL = 'nvidia/nemotron-3.5-lightning-30b-a3b';
 export const kModel = 'bolt_nvidia_model';
 
 export const modelStore = atom<string>(initStore());

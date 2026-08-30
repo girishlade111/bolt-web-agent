@@ -27,8 +27,14 @@ export function streamText(
   options?: StreamingOptions,
   modelName: string = DEFAULT_MODEL,
 ) {
+  const apiKey = getAPIKey(env);
+
+  if (!apiKey) {
+    throw new Error('NVIDIA_API_KEY is not set. Please add NVIDIA_API_KEY to your .env.local file and restart the dev server.');
+  }
+
   return _streamText({
-    model: getNvidiaModel(getAPIKey(env), modelName),
+    model: getNvidiaModel(apiKey, modelName),
     system: getSystemPrompt(),
     maxTokens: MAX_TOKENS,
     messages: convertToCoreMessages(messages),

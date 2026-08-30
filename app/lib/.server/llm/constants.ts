@@ -1,4 +1,4 @@
-export const DEFAULT_MODEL = 'qwen/qwen2.5-coder-32b-instruct';
+export const DEFAULT_MODEL = 'nvidia/nemotron-3.5-lightning-30b-a3b';
 
 export const MAX_TOKENS = 8192;
 

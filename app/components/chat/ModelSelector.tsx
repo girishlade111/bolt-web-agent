@@ -12,7 +12,7 @@ export const ModelSelector = memo(({ className, disabled = false }: ModelSelecto
   const currentModel = useStore(modelStore);
 
   // Group models by provider
-  const providers = ['Qwen', 'DeepSeek', 'Kimi', 'GLM', 'MiniMax', 'Meta', 'NVIDIA'] as const;
+  const providers = ['NVIDIA', 'Meta', 'Poolside'] as const;
 
   return (
     <div className={classNames('relative inline-flex items-center gap-1.5', className)}>
