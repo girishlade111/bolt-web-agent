@@ -3,3 +3,18 @@ name = "ls-build"
 compatibility_flags = ["nodejs_compat"]
 compatibility_date = "2024-07-01"
 pages_build_output_dir = "./build/client"
+
+# Rate limiting storage — Cloudflare KV (preferred for Pages/Workers).
+# Create once: `wrangler kv namespace create RATE_LIMIT_KV` and `wrangler kv namespace create RATE_LIMIT_KV --preview`
+# then replace the ids below. Until then the app falls back to in-memory counters (per-isolate, best-effort).
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "rate-limit-kv"
+preview_id = "rate-limit-kv-preview"
+
+# Optional Durable Object alternative (atomic, strongly consistent).
+# Uncomment to use DO instead of / in addition to KV. Requires `wrangler types` after enabling.
+# [durable_objects]
+# bindings = [{ name = "RATE_LIMITER_DO", class_name = "RateLimiterDO" }]
+# [[migrations]]
+# new_classes = ["RateLimiterDO"]
