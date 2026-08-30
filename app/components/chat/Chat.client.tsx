@@ -72,6 +72,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [chatStarted, setChatStarted] = useState(initialMessages.length > 0);
+  const [supabaseEnabled, setSupabaseEnabled] = useState(false);
 
   const { showChat } = useStore(chatStore);
   const selectedModel = useStore(modelStore);
@@ -82,6 +83,7 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
     api: '/api/chat',
     body: {
       model: selectedModel,
+      enableSupabase: supabaseEnabled,
     },
     onError: (error) => {
       logger.error('Request failed\n\n', error);
@@ -157,6 +159,26 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
 
     if (_input.length === 0 || isLoading) {
       return;
+    }
+
+    // Auto-provision Supabase if toggle is on or prompt looks like it needs a DB.
+    // Inject .env into WebContainer *before* LLM generation so file is present.
+    if (supabaseEnabled) {
+      try {
+        const result = await ensureSupabaseProvisioned(_input, true);
+        if (result?.provisioned) {
+          toast.success('Supabase database provisioned — .env injected');
+        }
+      } catch (e) {
+        logger.warn('Supabase provision failed (toggle)', e);
+      }
+    } else {
+      // Even without explicit toggle, check heuristic and provision silently
+      // so LLM can use Supabase if it chooses to generate DB-backed code.
+      try {
+        // fire-and-forget, but await to ensure .env exists before generation
+        await ensureSupabaseProvisioned(_input, false);
+      } catch {}
     }
 
     /**
