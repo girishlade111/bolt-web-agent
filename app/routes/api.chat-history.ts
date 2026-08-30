@@ -36,7 +36,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   if (!sessionId) {
     sessionId = generateSessionId();
-    setCookie = createSessionCookie(sessionId);
+    setCookie = createSessionCookie(sessionId, request);
   }
 
   const method = request.method.toUpperCase();
