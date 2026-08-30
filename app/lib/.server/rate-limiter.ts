@@ -61,15 +61,25 @@ export function getClientIP(request: Request): string {
   return '127.0.0.1';
 }
 
+function isValidSessionId(v: string | null | undefined): boolean {
+  if (!v) return false;
+  return /^[a-zA-Z0-9-_]{8,128}$/.test(v) || v.length >= 20;
+}
+
 export function getSessionId(request: Request): string | null {
   const cookies = parseCookies(request.headers.get('Cookie'));
   const v = cookies[SESSION_COOKIE_NAME];
-  if (v && /^[a-zA-Z0-9-_]{8,128}$/.test(v) || (v && v.length >= 20)) {
-    // accept UUIDs and any sufficiently long random string
-    return v;
+  if (isValidSessionId(v)) {
+    return v!;
   }
   // If cookie exists but is short/malformed, treat as missing and rotate
   return v && v.length > 0 ? v : null;
+}
+
+export function getEffectiveSessionId(request: Request): string | null {
+  const headerSid = request.headers.get('X-Session-Id')?.trim();
+  if (isValidSessionId(headerSid)) return headerSid!;
+  return getSessionId(request);
 }
 
 export function generateSessionId(): string {
@@ -197,15 +207,23 @@ export interface RateLimitResult {
  */
 export async function checkRateLimit(request: Request, env: RateLimitEnv): Promise<RateLimitResult> {
   const ip = getClientIP(request);
-  let sessionId = getSessionId(request);
+  const cookieSid = getSessionId(request);
+  const headerSid = request.headers.get('X-Session-Id')?.trim();
+  const headerValid = isValidSessionId(headerSid);
+  let sessionId: string | null = headerValid ? headerSid! : cookieSid;
   let isNewSession = false;
+  let needsCookieSync = false;
 
   if (!sessionId) {
     sessionId = generateSessionId();
     isNewSession = true;
+    needsCookieSync = true;
+  } else if (headerValid && cookieSid !== headerSid) {
+    // Header provided a valid ID that hasn't been stored in cookie yet (fork race) — sync cookie
+    needsCookieSync = true;
   }
 
-  const sKey = sessionKey(sessionId);
+  const sKey = sessionKey(sessionId!);
   const iKey = ipKey(ip);
   const sTtl = ttlForSessionBucket();
   const iTtl = ttlForIpBucket();
@@ -216,7 +234,7 @@ export async function checkRateLimit(request: Request, env: RateLimitEnv): Promi
     incrementCounter(env, iKey, iTtl),
   ]);
 
-  const cookieHeader = isNewSession ? createSessionCookie(sessionId, request) : null;
+  const cookieHeader = isNewSession || needsCookieSync ? createSessionCookie(sessionId!, request) : null;
 
   if (sessionCount > SESSION_LIMIT) {
     return {
