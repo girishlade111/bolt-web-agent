@@ -160,6 +160,9 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                           )}
                         </IconButton>
                         <ClientOnly>{() => <ModelSelector disabled={isStreaming} />}</ClientOnly>
+                        {onSupabaseToggle && (
+                          <SupabaseToggle enabled={supabaseEnabled} onToggle={onSupabaseToggle} disabled={isStreaming} />
+                        )}
                       </div>
                       {input.length > 3 ? (
                         <div className="hidden sm:flex items-center gap-1 text-[11px] text-[#5c5c5c]">
@@ -240,6 +243,9 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                           )}
                         </IconButton>
                         <ClientOnly>{() => <ModelSelector disabled={isStreaming} />}</ClientOnly>
+                        {onSupabaseToggle && (
+                          <SupabaseToggle enabled={supabaseEnabled} onToggle={onSupabaseToggle} disabled={isStreaming} />
+                        )}
                       </div>
                       {input.length > 3 ? (
                         <div className="hidden sm:flex items-center gap-1 text-[11px] text-[#5c5c5c]">
