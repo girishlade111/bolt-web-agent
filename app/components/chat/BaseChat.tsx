@@ -70,109 +70,184 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         <ClientOnly>{() => <Menu />}</ClientOnly>
 
         <div ref={scrollRef} className="flex overflow-y-auto w-full h-full">
-          <div className={classNames(styles.Chat, 'flex flex-col flex-grow min-w-[var(--chat-min-width)] h-full')}>
-            {!chatStarted && (
-              <div id="intro" className="pt-[48px] pb-4 max-w-[640px] w-full mx-auto px-8">
-                <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-[#e8e8e8]">Where ideas begin</h1>
-                <p className="mt-2 text-[12.5px] leading-relaxed text-[#8a8a8a] max-w-[480px]">
-                  LS Build brings ideas to life in seconds. Prompt, run, edit and deploy — all in the browser, no setup required.
-                </p>
-              </div>
+          <div
+            className={classNames(
+              styles.Chat,
+              'flex flex-col flex-grow min-w-[var(--chat-min-width)] h-full',
+              { 'justify-center items-center': !chatStarted },
             )}
-
-            <div className={classNames('px-8', { 'h-full flex flex-col': chatStarted })}>
-              <ClientOnly>
-                {() => {
-                  return chatStarted ? (
+          >
+            {chatStarted ? (
+              <div className="px-8 h-full flex flex-col">
+                <ClientOnly>
+                  {() => (
                     <Messages
                       ref={messageRef}
                       className="flex flex-col w-full flex-1 max-w-chat px-0 pb-6 mx-auto z-1"
                       messages={messages}
                       isStreaming={isStreaming}
                     />
-                  ) : null;
-                }}
-              </ClientOnly>
+                  )}
+                </ClientOnly>
 
-              {/* Prompt — card with hairline border, no shadow */}
-              <div className={classNames('relative w-full max-w-chat mx-auto z-prompt', { 'sticky bottom-0': chatStarted })}>
-                <div className="rounded-[8px] bg-[#161616] border border-[#2a2a2a] overflow-hidden">
-                  <textarea
-                    ref={textareaRef}
-                    className="w-full pl-4 pr-[52px] pt-3.5 pb-2 focus:outline-none resize-none text-[13.5px] leading-relaxed text-[#e8e8e8] placeholder-[#5c5c5c] bg-transparent"
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        if (event.shiftKey) return;
-                        event.preventDefault();
-                        sendMessage?.(event);
-                      }
-                    }}
-                    value={input}
-                    onChange={(event) => handleInputChange?.(event)}
-                    style={{
-                      minHeight: TEXTAREA_MIN_HEIGHT,
-                      maxHeight: TEXTAREA_MAX_HEIGHT,
-                    }}
-                    placeholder="How can LS Build help you today?"
-                    translate="no"
-                  />
-                  <ClientOnly>
-                    {() => (
-                      <SendButton
-                        show={input.length > 0 || isStreaming}
-                        isStreaming={isStreaming}
-                        onClick={(event) => {
-                          if (isStreaming) {
-                            handleStop?.();
-                            return;
-                          }
+                {/* Prompt — sticky at bottom when chat started */}
+                <div className="relative w-full max-w-chat mx-auto z-prompt sticky bottom-0">
+                  <div className="rounded-[8px] bg-[#161616] border border-[#2a2a2a] overflow-hidden">
+                    <textarea
+                      ref={textareaRef}
+                      className="w-full pl-4 pr-[52px] pt-3.5 pb-2 focus:outline-none resize-none text-[13.5px] leading-relaxed text-[#e8e8e8] placeholder-[#5c5c5c] bg-transparent"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          if (event.shiftKey) return;
+                          event.preventDefault();
                           sendMessage?.(event);
-                        }}
-                      />
-                    )}
-                  </ClientOnly>
+                        }
+                      }}
+                      value={input}
+                      onChange={(event) => handleInputChange?.(event)}
+                      style={{
+                        minHeight: TEXTAREA_MIN_HEIGHT,
+                        maxHeight: TEXTAREA_MAX_HEIGHT,
+                      }}
+                      placeholder="How can LS Build help you today?"
+                      translate="no"
+                    />
+                    <ClientOnly>
+                      {() => (
+                        <SendButton
+                          show={input.length > 0 || isStreaming}
+                          isStreaming={isStreaming}
+                          onClick={(event) => {
+                            if (isStreaming) {
+                              handleStop?.();
+                              return;
+                            }
+                            sendMessage?.(event);
+                          }}
+                        />
+                      )}
+                    </ClientOnly>
 
-                  {/* Toolbar — separated by hairline, quiet buttons */}
-                  <div className="flex justify-between items-center gap-2 px-3 py-2.5 border-t border-[#2a2a2a] bg-[#161616]">
-                    <div className="flex gap-2 items-center">
-                      <IconButton
-                        title="Enhance prompt"
-                        disabled={input.length === 0 || enhancingPrompt}
-                        className={classNames(
-                          'rounded-[6px]! border! px-2.5! py-1! text-xs! font-medium! transition-colors',
-                          promptEnhanced
-                            ? 'bg-[#1c1c1c]! border-[#2a2a2a]! text-[#e07856]!'
-                            : 'bg-[#1c1c1c] border-[#2a2a2a] text-[#8a8a8a] hover:text-[#e8e8e8] hover:bg-[#242424]',
-                        )}
-                        onClick={() => enhancePrompt?.()}
-                      >
-                        {enhancingPrompt ? (
-                          <>
-                            <div className="i-svg-spinners:90-ring-with-bg text-[#e07856] text-sm" />
-                            <span className="ml-1.5 text-xs">Enhancing…</span>
-                          </>
-                        ) : (
-                          <>
-                            <div className="i-ph:sparkle text-xs opacity-70" />
-                            <span className="ml-1 text-xs">{promptEnhanced ? 'Enhanced' : 'Enhance'}</span>
-                          </>
-                        )}
-                      </IconButton>
-                      <ClientOnly>{() => <ModelSelector disabled={isStreaming} />}</ClientOnly>
-                    </div>
-                    {input.length > 3 ? (
-                      <div className="hidden sm:flex items-center gap-1 text-[11px] text-[#5c5c5c]">
-                        <span>
-                          <kbd className="kdb">Shift</kbd> + <kbd className="kdb">↵</kbd> new line
-                        </span>
+                    {/* Toolbar */}
+                    <div className="flex justify-between items-center gap-2 px-3 py-2.5 border-t border-[#2a2a2a] bg-[#161616]">
+                      <div className="flex gap-2 items-center">
+                        <IconButton
+                          title="Enhance prompt"
+                          disabled={input.length === 0 || enhancingPrompt}
+                          className={classNames(
+                            'rounded-[6px]! border! px-2.5! py-1! text-xs! font-medium! transition-colors',
+                            promptEnhanced
+                              ? 'bg-[#1c1c1c]! border-[#2a2a2a]! text-[#e07856]!'
+                              : 'bg-[#1c1c1c] border-[#2a2a2a] text-[#8a8a8a] hover:text-[#e8e8e8] hover:bg-[#242424]',
+                          )}
+                          onClick={() => enhancePrompt?.()}
+                        >
+                          {enhancingPrompt ? (
+                            <>
+                              <div className="i-svg-spinners:90-ring-with-bg text-[#e07856] text-sm" />
+                              <span className="ml-1.5 text-xs">Enhancing…</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="i-ph:sparkle text-xs opacity-70" />
+                              <span className="ml-1 text-xs">{promptEnhanced ? 'Enhanced' : 'Enhance'}</span>
+                            </>
+                          )}
+                        </IconButton>
+                        <ClientOnly>{() => <ModelSelector disabled={isStreaming} />}</ClientOnly>
                       </div>
-                    ) : null}
+                      {input.length > 3 ? (
+                        <div className="hidden sm:flex items-center gap-1 text-[11px] text-[#5c5c5c]">
+                          <span>
+                            <kbd className="kdb">Shift</kbd> + <kbd className="kdb">↵</kbd> new line
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="bg-[#0d0d0d] pb-6" />
+                </div>
+              </div>
+            ) : (
+              /* Home page — only the prompt input, vertically + horizontally centered */
+              <div className="w-full max-w-[640px] px-8">
+                <div className="relative w-full max-w-chat mx-auto z-prompt">
+                  <div className="rounded-[8px] bg-[#161616] border border-[#2a2a2a] overflow-hidden">
+                    <textarea
+                      ref={textareaRef}
+                      className="w-full pl-4 pr-[52px] pt-3.5 pb-2 focus:outline-none resize-none text-[13.5px] leading-relaxed text-[#e8e8e8] placeholder-[#5c5c5c] bg-transparent"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          if (event.shiftKey) return;
+                          event.preventDefault();
+                          sendMessage?.(event);
+                        }
+                      }}
+                      value={input}
+                      onChange={(event) => handleInputChange?.(event)}
+                      style={{
+                        minHeight: TEXTAREA_MIN_HEIGHT,
+                        maxHeight: TEXTAREA_MAX_HEIGHT,
+                      }}
+                      placeholder="How can LS Build help you today?"
+                      translate="no"
+                    />
+                    <ClientOnly>
+                      {() => (
+                        <SendButton
+                          show={input.length > 0 || isStreaming}
+                          isStreaming={isStreaming}
+                          onClick={(event) => {
+                            if (isStreaming) {
+                              handleStop?.();
+                              return;
+                            }
+                            sendMessage?.(event);
+                          }}
+                        />
+                      )}
+                    </ClientOnly>
+
+                    {/* Toolbar */}
+                    <div className="flex justify-between items-center gap-2 px-3 py-2.5 border-t border-[#2a2a2a] bg-[#161616]">
+                      <div className="flex gap-2 items-center">
+                        <IconButton
+                          title="Enhance prompt"
+                          disabled={input.length === 0 || enhancingPrompt}
+                          className={classNames(
+                            'rounded-[6px]! border! px-2.5! py-1! text-xs! font-medium! transition-colors',
+                            promptEnhanced
+                              ? 'bg-[#1c1c1c]! border-[#2a2a2a]! text-[#e07856]!'
+                              : 'bg-[#1c1c1c] border-[#2a2a2a] text-[#8a8a8a] hover:text-[#e8e8e8] hover:bg-[#242424]',
+                          )}
+                          onClick={() => enhancePrompt?.()}
+                        >
+                          {enhancingPrompt ? (
+                            <>
+                              <div className="i-svg-spinners:90-ring-with-bg text-[#e07856] text-sm" />
+                              <span className="ml-1.5 text-xs">Enhancing…</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="i-ph:sparkle text-xs opacity-70" />
+                              <span className="ml-1 text-xs">{promptEnhanced ? 'Enhanced' : 'Enhance'}</span>
+                            </>
+                          )}
+                        </IconButton>
+                        <ClientOnly>{() => <ModelSelector disabled={isStreaming} />}</ClientOnly>
+                      </div>
+                      {input.length > 3 ? (
+                        <div className="hidden sm:flex items-center gap-1 text-[11px] text-[#5c5c5c]">
+                          <span>
+                            <kbd className="kdb">Shift</kbd> + <kbd className="kdb">↵</kbd> new line
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
-                <div className="bg-[#0d0d0d] pb-6" />
               </div>
-            </div>
-
+            )}
           </div>
 
           <ClientOnly>{() => <Workbench chatStarted={chatStarted} isStreaming={isStreaming} />}</ClientOnly>
