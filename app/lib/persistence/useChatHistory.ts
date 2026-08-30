@@ -73,6 +73,7 @@ async function restoreFileSnapshot(snapshot: Record<string, string> | null | und
 async function fetchServerChat(lookupId: string): Promise<ChatHistoryItem | null> {
   try {
     const res = await fetch(`/api/chat-history?id=${encodeURIComponent(lookupId)}`, {
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
     });
     if (!res.ok) return null;
@@ -95,6 +96,7 @@ async function syncToServer(item: {
     // Keep server in sync on each message — best-effort, no toast on failure (offline)
     await fetch('/api/chat-history', {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     });
