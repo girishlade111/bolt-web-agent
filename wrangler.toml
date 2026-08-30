@@ -26,6 +26,13 @@ binding = "CHAT_HISTORY_KV"
 id = "00000000000000000000000000000002"
 preview_id = "00000000000000000000000000000002"
 
+# Deploy tokens — session-scoped via bolt_session for user-generated deploys (separate from builder's own Pages hosting)
+# Create once: `wrangler kv namespace create DEPLOY_TOKENS_KV`
+[[kv_namespaces]]
+binding = "DEPLOY_TOKENS_KV"
+id = "00000000000000000000000000000003"
+preview_id = "00000000000000000000000000000003"
+
 # Optional Durable Object alternative (atomic, strongly consistent).
 # Uncomment to use DO instead of / in addition to KV. Requires `wrangler types` after enabling.
 # [durable_objects]
