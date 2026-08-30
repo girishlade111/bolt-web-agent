@@ -4,6 +4,13 @@ import type { ChatHistoryItem } from './useChatHistory';
 
 const logger = createScopedLogger('ChatHistory');
 
+/**
+ * IndexedDB is now a local cache/fallback. Source of truth is server-side
+ * Postgres/Supabase (keyed by session_id, nullable user_id). See
+ * app/lib/.server/chat-persistence.ts and supabase/migrations/* for server schema.
+ * This file is kept for offline support and fast local reads.
+ */
+
 // this is used at the top level and never rejects
 export async function openDatabase(): Promise<IDBDatabase | undefined> {
   return new Promise((resolve) => {
