@@ -8,10 +8,10 @@ export function Header() {
   const chat = useStore(chatStore);
 
   return (
-    <header className="flex items-center px-6 h-[56px] shrink-0 bg-[#0d0d0d] border-b border-[#2a2a2a] sticky top-0 z-20">
+    <header className="flex items-center px-3 sm:px-6 h-[56px] shrink-0 bg-[#0d0d0d] border-b border-[#2a2a2a] sticky top-0 z-20 gap-2">
       {/* Left — Brand */}
-      <div className="flex items-center gap-3 shrink-0">
-        <a href="/" className="flex items-center gap-2.5 group">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
+        <a href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
           {/* Enterprise SVG Logo Mark */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -56,19 +56,19 @@ export function Header() {
             </g>
             <circle cx="29.5" cy="29.5" r="1.2" fill="#38bdf8" opacity="0.8"/>
           </svg>
-          <div className="flex flex-col">
-            <span className="text-[13.5px] font-semibold leading-none tracking-tight text-[#e8e8e8]">LS Build</span>
-            <span className="text-[11px] leading-none text-[#8a8a8a] mt-0.5">AI Application Builder</span>
+          <div className="hidden xs:flex sm:flex flex-col">
+            <span className="text-[13px] sm:text-[13.5px] font-semibold leading-none tracking-tight text-[#e8e8e8]">LS Build</span>
+            <span className="hidden sm:block text-[11px] leading-none text-[#8a8a8a] mt-0.5">AI Application Builder</span>
           </div>
         </a>
-        <div className="hidden sm:flex items-center ml-3 pl-3 border-l border-[#2a2a2a]">
+        <div className="hidden sm:flex items-center ml-2 sm:ml-3 pl-2 sm:pl-3 border-l border-[#2a2a2a]">
           <span className="text-xs text-[#8a8a8a]">Enterprise</span>
           <span className="ml-2 w-1.5 h-1.5 rounded-full bg-[#3ecf5e]" />
         </div>
       </div>
 
-      {/* Center — Chat description as quiet inline */}
-      <div className="flex-1 flex justify-center px-4 min-w-0">
+      {/* Center — Chat description as quiet inline — hidden on mobile to prevent header overflow */}
+      <div className="hidden sm:flex flex-1 justify-center px-2 sm:px-4 min-w-0">
         <span className="truncate text-center">
           <ClientOnly>
             {() => (
@@ -81,7 +81,7 @@ export function Header() {
       </div>
 
       {/* Right */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
         {chat.started && (
           <ClientOnly>
             {() => <HeaderActionButtons />}
