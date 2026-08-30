@@ -287,6 +287,7 @@ export function createRateLimitResponse(result: RateLimitResult): Response {
     'X-RateLimit-Limit-IP': String(IP_LIMIT),
     'X-RateLimit-Remaining-Session': String(Math.max(0, SESSION_LIMIT - result.sessionCount)),
     'X-RateLimit-Remaining-IP': String(Math.max(0, IP_LIMIT - result.ipCount)),
+    'X-Session-Id': result.sessionId,
   };
   if (result.cookieHeader) {
     headers['Set-Cookie'] = result.cookieHeader;
@@ -309,4 +310,5 @@ export function appendRateLimitHeaders(response: Response, result: RateLimitResu
   response.headers.set('X-RateLimit-Limit-IP', String(IP_LIMIT));
   response.headers.set('X-RateLimit-Remaining-IP', String(Math.max(0, IP_LIMIT - result.ipCount)));
   response.headers.set('X-RateLimit-Session', result.sessionId);
+  response.headers.set('X-Session-Id', result.sessionId);
 }
