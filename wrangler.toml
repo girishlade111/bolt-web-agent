@@ -19,6 +19,13 @@ binding = "SUPABASE_KV"
 id = "00000000000000000000000000000001"
 preview_id = "00000000000000000000000000000001"
 
+# Chat history (server-side Postgres primary, KV fallback) — session_id keyed, user_id nullable
+# Create once: `wrangler kv namespace create CHAT_HISTORY_KV`
+[[kv_namespaces]]
+binding = "CHAT_HISTORY_KV"
+id = "00000000000000000000000000000002"
+preview_id = "00000000000000000000000000000002"
+
 # Optional Durable Object alternative (atomic, strongly consistent).
 # Uncomment to use DO instead of / in addition to KV. Requires `wrangler types` after enabling.
 # [durable_objects]
