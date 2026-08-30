@@ -5,7 +5,7 @@
  * - Future-proof schema: prompts instruct LLM to add nullable `user_id UUID` column.
  */
 
-import { getSessionId, generateSessionId } from '~/lib/.server/rate-limiter';
+import { getSessionId, getEffectiveSessionId, generateSessionId } from '~/lib/.server/rate-limiter';
 
 export interface SupabaseProject {
   id: string;
@@ -294,12 +294,12 @@ export async function getSupabaseProjectForSession(sessionId: string, env: Env):
   return getCachedProject(sessionId, env);
 }
 
-// Helper to pull sessionId from request (reuses rate-limiter cookie)
+// Helper to pull sessionId from request (prefers X-Session-Id header for fork-race safety)
 export function getSessionIdFromRequest(request: Request): string | null {
-  return getSessionId(request);
+  return getEffectiveSessionId(request);
 }
 
 // Ensure sessionId exists (generate if missing, but caller should set cookie via rate-limiter loader)
 export function ensureSessionId(request: Request): string {
-  return getSessionId(request) ?? generateSessionId();
+  return getEffectiveSessionId(request) ?? generateSessionId();
 }

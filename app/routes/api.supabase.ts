@@ -6,13 +6,13 @@ import {
   getSessionIdFromRequest,
   needsDatabase,
 } from '~/lib/.server/supabase';
-import { generateSessionId, createSessionCookie } from '~/lib/.server/rate-limiter';
+import { getSessionId, getEffectiveSessionId, generateSessionId, createSessionCookie } from '~/lib/.server/rate-limiter';
 
 // GET → return current session's project if exists, else { provisioned: false }
 // Query ?prompt=… can be used to check classification without provisioning
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const env = context.cloudflare.env as Env;
-  const sessionId = getSessionIdFromRequest(request);
+  const sessionId = getEffectiveSessionId(request);
   const url = new URL(request.url);
   const prompt = url.searchParams.get('prompt') ?? undefined;
 
@@ -20,27 +20,39 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     return json({ provisioned: false, needsDatabase: prompt ? needsDatabase(prompt) : false });
   }
 
+  const headers: Record<string, string> = { 'X-Session-Id': sessionId };
+  const cookieSid = getSessionId(request);
+  if (cookieSid !== sessionId) {
+    headers['Set-Cookie'] = createSessionCookie(sessionId, request);
+  }
+
   const project = await getSupabaseProjectForSession(sessionId, env);
 
   if (!project) {
-    return json({
-      provisioned: false,
-      needsDatabase: prompt ? needsDatabase(prompt) : false,
-      sessionId,
-    });
+    return json(
+      {
+        provisioned: false,
+        needsDatabase: prompt ? needsDatabase(prompt) : false,
+        sessionId,
+      },
+      { headers },
+    );
   }
 
-  return json({
-    provisioned: true,
-    project: {
-      id: project.id,
-      url: project.url,
-      anonKey: project.anonKey,
-      status: project.status,
+  return json(
+    {
+      provisioned: true,
+      project: {
+        id: project.id,
+        url: project.url,
+        anonKey: project.anonKey,
+        status: project.status,
+      },
+      envString: formatSupabaseEnv(project),
+      sessionId,
     },
-    envString: formatSupabaseEnv(project),
-    sessionId,
-  });
+    { headers },
+  );
 }
 
 // POST → provision (or return cached) if needsDatabase or explicitToggle

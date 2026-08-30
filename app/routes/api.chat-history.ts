@@ -1,5 +1,5 @@
 import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from '@remix-run/cloudflare';
-import { getSessionId, generateSessionId, createSessionCookie } from '~/lib/.server/rate-limiter';
+import { getSessionId, getEffectiveSessionId, generateSessionId, createSessionCookie } from '~/lib/.server/rate-limiter';
 import {
   getChatsForSession,
   getChatForSession,
@@ -10,7 +10,7 @@ import {
 // GET /api/chat-history?id=xxx or /api/chat-history -> list
 export async function loader({ request, context }: LoaderFunctionArgs) {
   const env = context.cloudflare.env as Env;
-  let sessionId = getSessionId(request);
+  let sessionId = getEffectiveSessionId(request);
   if (!sessionId) {
     // No session yet — return empty, client will use IndexedDB cache
     return json({ chats: [], sessionId: null });
@@ -19,24 +19,36 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const lookupId = url.searchParams.get('id');
 
+  // Always return X-Session-Id so client can capture atomic session
+  const headers: Record<string, string> = { 'X-Session-Id': sessionId };
+  const cookieSid = getSessionId(request);
+  if (cookieSid !== sessionId) {
+    headers['Set-Cookie'] = createSessionCookie(sessionId, request);
+  }
+
   if (lookupId) {
     const chat = await getChatForSession(sessionId, lookupId, env);
-    if (!chat) return json({ chat: null, sessionId }, { status: 404 });
-    return json({ chat, sessionId });
+    if (!chat) return json({ chat: null, sessionId }, { status: 404, headers });
+    return json({ chat, sessionId }, { headers });
   }
 
   const chats = await getChatsForSession(sessionId, env);
-  return json({ chats, sessionId });
+  return json({ chats, sessionId }, { headers });
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
   const env = context.cloudflare.env as Env;
-  let sessionId = getSessionId(request);
+  let sessionId = getEffectiveSessionId(request);
   let setCookie: string | undefined;
 
   if (!sessionId) {
     sessionId = generateSessionId();
     setCookie = createSessionCookie(sessionId, request);
+  } else {
+    const cookieSid = getSessionId(request);
+    if (cookieSid !== sessionId) {
+      setCookie = createSessionCookie(sessionId, request);
+    }
   }
 
   const method = request.method.toUpperCase();
@@ -61,7 +73,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
       env,
     );
 
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { 'X-Session-Id': sessionId };
     if (setCookie) headers['Set-Cookie'] = setCookie;
 
     return json({ ok: true, chat: saved, sessionId }, { headers });
@@ -77,7 +89,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     if (!id) return json({ error: 'Missing id' }, { status: 400 });
 
     await deleteChatForSession(sessionId, id, env);
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { 'X-Session-Id': sessionId };
     if (setCookie) headers['Set-Cookie'] = setCookie;
     return json({ ok: true, sessionId }, { headers });
   }
