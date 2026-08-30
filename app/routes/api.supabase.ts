@@ -52,7 +52,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   if (!sessionId) {
     sessionId = generateSessionId();
-    setCookie = createSessionCookie(sessionId);
+    setCookie = createSessionCookie(sessionId, request);
   }
 
   let body: { prompt?: string; enableSupabase?: boolean; force?: boolean } = {};
