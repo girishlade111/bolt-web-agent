@@ -13,6 +13,7 @@ import { fileModificationsToHTML } from '~/utils/diff';
 import { cubicEasingFn } from '~/utils/easings';
 import { createScopedLogger, renderLogger } from '~/utils/logger';
 import { BaseChat } from './BaseChat';
+import { ensureSupabaseProvisioned } from '~/lib/supabase-env.client';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
