@@ -83,9 +83,49 @@ export function Menu() {
       className="flex flex-col fixed top-0 w-[260px] h-full bg-[#0d0d0d] border-r border-[#2a2a2a] z-sidebar overflow-hidden"
     >
       <div className="h-[56px] shrink-0 flex items-center px-4 border-b border-[#2a2a2a]">
-        <div className="w-7 h-7 rounded-[6px] bg-[#161616] border border-[#2a2a2a] flex items-center justify-center">
-          <span className="text-[11px] font-semibold text-[#e8e8e8]">LS</span>
-        </div>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 32 32"
+          width="26"
+          height="26"
+          className="shrink-0"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="mIconBg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#1e1e38"/>
+              <stop offset="100%" stopColor="#111120"/>
+            </linearGradient>
+            <linearGradient id="mAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#6366f1"/>
+              <stop offset="50%" stopColor="#818cf8"/>
+              <stop offset="100%" stopColor="#38bdf8"/>
+            </linearGradient>
+            <linearGradient id="mShine" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.1"/>
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0"/>
+            </linearGradient>
+            <filter id="mGlow">
+              <feGaussianBlur stdDeviation="1" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <rect width="32" height="32" rx="7" fill="url(#mIconBg)"/>
+          <rect width="32" height="16" rx="7" fill="url(#mShine)"/>
+          <rect x="0.5" y="0.5" width="31" height="31" rx="6.5" fill="none" stroke="url(#mAccent)" strokeOpacity="0.45" strokeWidth="0.9"/>
+          <g filter="url(#mGlow)">
+            <rect x="5.5" y="7" width="2.8" height="13.5" rx="1" fill="url(#mAccent)"/>
+            <rect x="5.5" y="17.7" width="8.5" height="2.8" rx="1" fill="url(#mAccent)"/>
+          </g>
+          <g filter="url(#mGlow)">
+            <rect x="16.5" y="7" width="8" height="2.6" rx="0.9" fill="url(#mAccent)"/>
+            <rect x="16.5" y="14.7" width="8" height="2.6" rx="0.9" fill="url(#mAccent)"/>
+            <rect x="16.5" y="22.4" width="8" height="2.6" rx="0.9" fill="url(#mAccent)"/>
+            <rect x="16.5" y="7" width="2.6" height="7.7" rx="0.9" fill="url(#mAccent)"/>
+            <rect x="21.9" y="14.7" width="2.6" height="10.3" rx="0.9" fill="url(#mAccent)"/>
+          </g>
+          <circle cx="29.5" cy="29.5" r="1.2" fill="#38bdf8" opacity="0.8"/>
+        </svg>
         <div className="ml-2.5">
           <div className="text-[13px] font-medium leading-none text-[#e8e8e8]">LS Build</div>
           <div className="text-[11px] text-[#8a8a8a] leading-none mt-0.5">History</div>
