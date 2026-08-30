@@ -14,6 +14,7 @@ import { cubicEasingFn } from '~/utils/easings';
 import { createScopedLogger, renderLogger } from '~/utils/logger';
 import { BaseChat } from './BaseChat';
 import { ensureSupabaseProvisioned } from '~/lib/supabase-env.client';
+import { fetchWithSession } from '~/lib/session.client';
 
 const toastAnimation = cssTransition({
   enter: 'animated fadeInRight',
@@ -82,8 +83,9 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
   const { messages, isLoading, input, handleInputChange, setInput, stop, append } = useChat({
     api: '/api/chat',
     credentials: 'include' as any,
-    // ensure HttpOnly bolt_session is sent even under strict fetch defaults / CDN edge
-    fetch: ((url: any, options: any) => fetch(url, { ...options, credentials: 'include' as any })) as any,
+    // fork-race fix: capture X-Session-Id from first response and replay as X-Session-Id header
+    // so concurrent api/chat-history + api/supabase in same turn share atomic session
+    fetch: fetchWithSession as any,
     body: {
       model: selectedModel,
       enableSupabase: supabaseEnabled,

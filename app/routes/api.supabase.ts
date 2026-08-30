@@ -59,12 +59,17 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
 // Body: { prompt?: string, enableSupabase?: boolean, force?: boolean }
 export async function action({ request, context }: ActionFunctionArgs) {
   const env = context.cloudflare.env as Env;
-  let sessionId = getSessionIdFromRequest(request);
+  let sessionId = getEffectiveSessionId(request);
   let setCookie: string | undefined;
 
   if (!sessionId) {
     sessionId = generateSessionId();
     setCookie = createSessionCookie(sessionId, request);
+  } else {
+    const cookieSid = getSessionId(request);
+    if (cookieSid !== sessionId) {
+      setCookie = createSessionCookie(sessionId, request);
+    }
   }
 
   let body: { prompt?: string; enableSupabase?: boolean; force?: boolean } = {};
@@ -88,7 +93,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
 
   // Not needed → no provisioning
   if (!project) {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { 'X-Session-Id': sessionId! };
     if (setCookie) headers['Set-Cookie'] = setCookie;
     return json(
       {
@@ -102,7 +107,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     );
   }
 
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { 'X-Session-Id': sessionId! };
   if (setCookie) headers['Set-Cookie'] = setCookie;
 
   return json(

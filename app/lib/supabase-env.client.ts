@@ -1,6 +1,7 @@
 // Client-side helper to inject Supabase env into WebContainer's .env
 import { webcontainer } from '~/lib/webcontainer';
 import { WORK_DIR } from '~/utils/constants';
+import { fetchWithSession } from '~/lib/session.client';
 
 export async function injectSupabaseEnv(envString: string): Promise<void> {
   const wc = await webcontainer;
