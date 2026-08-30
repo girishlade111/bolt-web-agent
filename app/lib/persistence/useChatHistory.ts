@@ -94,9 +94,8 @@ async function syncToServer(item: {
 }): Promise<void> {
   try {
     // Keep server in sync on each message — best-effort, no toast on failure (offline)
-    await fetch('/api/chat-history', {
+    await fetchWithSession('/api/chat-history', {
       method: 'POST',
-      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     });
