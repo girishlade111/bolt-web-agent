@@ -239,7 +239,7 @@ export async function checkRateLimit(request: Request, env: RateLimitEnv): Promi
   if (sessionCount > SESSION_LIMIT) {
     return {
       allowed: false,
-      sessionId,
+      sessionId: sessionId!,
       isNewSession,
       cookieHeader,
       ip,
@@ -254,7 +254,7 @@ export async function checkRateLimit(request: Request, env: RateLimitEnv): Promi
   if (ipCount > IP_LIMIT) {
     return {
       allowed: false,
-      sessionId,
+      sessionId: sessionId!,
       isNewSession,
       cookieHeader,
       ip,
@@ -268,7 +268,7 @@ export async function checkRateLimit(request: Request, env: RateLimitEnv): Promi
 
   return {
     allowed: true,
-    sessionId,
+    sessionId: sessionId!,
     isNewSession,
     cookieHeader,
     ip,
