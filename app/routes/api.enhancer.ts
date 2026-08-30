@@ -1,13 +1,24 @@
 import { type ActionFunctionArgs } from '@remix-run/cloudflare';
 import { StreamingTextResponse, parseStreamPart } from 'ai';
 import { streamText } from '~/lib/.server/llm/stream-text';
+import { appendRateLimitHeaders, checkRateLimit, createRateLimitResponse } from '~/lib/.server/rate-limiter';
 import { stripIndents } from '~/utils/stripIndent';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 export async function action(args: ActionFunctionArgs) {
-  return enhancerAction(args);
+  const rateLimit = await checkRateLimit(args.request, args.context.cloudflare.env as any);
+
+  if (!rateLimit.allowed) {
+    return createRateLimitResponse(rateLimit);
+  }
+
+  const response = await enhancerAction(args);
+
+  appendRateLimitHeaders(response as unknown as Response, rateLimit);
+
+  return response;
 }
 
 async function enhancerAction({ context, request }: ActionFunctionArgs) {
