@@ -241,6 +241,8 @@ export const ChatImpl = memo(({ initialMessages, storeMessageHistory }: ChatProp
       scrollRef={scrollRef}
       handleInputChange={handleInputChange}
       handleStop={abort}
+      supabaseEnabled={supabaseEnabled}
+      onSupabaseToggle={setSupabaseEnabled}
       messages={messages.map((message, i) => {
         if (message.role === 'user') {
           return message;
