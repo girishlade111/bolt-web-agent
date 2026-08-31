@@ -138,6 +138,41 @@ export async function pollVercelDeployment(
 }
 
 /**
+ * Netlify-specific polling that also surfaces best-effort build logs (from the
+ * /api/deploy/netlify status endpoint, which proxies Netlify's deploy log API).
+ * deploymentId format: `${siteId}:${deployId}`. Calls onLog with new log lines.
+ */
+export async function pollNetlifyDeployment(
+  deploymentId: string,
+  projectName: string,
+  opts: { intervalMs?: number; timeoutMs?: number; onLog?: (line: string) => void } = {},
+): Promise<DeployResult> {
+  const interval = opts.intervalMs ?? 3000;
+  const timeout = opts.timeoutMs ?? 180000;
+  const seen = new Set<string>();
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const res = await fetchWithSession(
+      `/api/deploy/netlify?deploymentId=${encodeURIComponent(deploymentId)}&projectName=${encodeURIComponent(projectName)}`,
+    );
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error ?? `Netlify status check failed: ${res.status}`);
+    if (Array.isArray(data.logs)) {
+      for (const line of data.logs) {
+        if (typeof line === 'string' && !seen.has(line)) {
+          seen.add(line);
+          opts.onLog?.(line);
+        }
+      }
+    }
+    if (data.status === 'ready' || data.status === 'success') return data as DeployResult;
+    if (data.status === 'error' || data.status === 'failed') throw new Error(data.error ?? 'Netlify deployment failed');
+    await new Promise((r) => setTimeout(r, interval));
+  }
+  throw new Error('Netlify deployment polling timed out');
+}
+
+/**
  * Poll deployment status until ready. Cloudflare Pages Direct Upload is async;
  * Vercel/Netlify similarly poll. Reuses same session header via fetchWithSession.
  */
