@@ -15,6 +15,8 @@ import {
   deployToVercel,
   deployToNetlify,
   pollDeploymentStatus,
+  pollVercelDeployment,
+  getDeployToken as getStoredVercelToken,
   type DeployProvider,
 } from '~/lib/deploy.client';
 
@@ -109,6 +111,91 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
   const [deployError, setDeployError] = useState<string | null>(null);
   const [deployUrl, setDeployUrl] = useState<string | null>(null);
   const [deployStatus, setDeployStatus] = useState<string | null>(null);
+
+  // one-click Vercel deploy panel states
+  const [vercelOpen, setVercelOpen] = useState(false);
+  const [vercelLoading, setVercelLoading] = useState(false);
+  const [vercelError, setVercelError] = useState<string | null>(null);
+  const [vercelUrl, setVercelUrl] = useState<string | null>(null);
+  const [vercelStatus, setVercelStatus] = useState<string | null>(null);
+  const [vercelLogs, setVercelLogs] = useState<string[]>([]);
+  const vercelLogRef = useRef<HTMLDivElement | null>(null);
+  const vercelAbortRef = useRef(false);
+
+  // auto-scroll deploy log panel
+  useEffect(() => {
+    if (vercelLogRef.current) {
+      vercelLogRef.current.scrollTop = vercelLogRef.current.scrollHeight;
+    }
+  }, [vercelLogs, vercelOpen]);
+
+  const handleDeployVercel = async () => {
+    setVercelError(null);
+    setVercelUrl(null);
+    setVercelLogs([]);
+    setVercelStatus('initializing');
+    vercelAbortRef.current = false;
+
+    // derive project name from artifact title
+    const artifact = workbenchStore.firstArtifact;
+    const projectName =
+      (artifact?.title ?? '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 63) || `bolt-${Date.now().toString(36)}`;
+
+    // use session-scoped token (bolt_session KV) — same pattern as GitHub
+    const storedToken = await getStoredVercelToken('vercel');
+
+    if (!storedToken) {
+      // no session token yet — open the existing deploy dialog which collects the token
+      setDeployProvider('vercel');
+      setDeployError(null);
+      setDeployUrl(null);
+      setDeployOpen(true);
+      return;
+    }
+
+    setVercelLoading(true);
+
+    try {
+      const result = await deployToVercel({ projectName });
+
+      let finalUrl = result.url ?? `https://${projectName}.vercel.app`;
+      let status = result.status;
+
+      if (result.deploymentId && status === 'initializing') {
+        setVercelStatus('building');
+        try {
+          const polled = await pollVercelDeployment(result.deploymentId, projectName, {
+            intervalMs: 3000,
+            timeoutMs: 180000,
+            onLog: (line) => setVercelLogs((prev) => [...prev.slice(-499), line]),
+          });
+          finalUrl = polled.url || finalUrl;
+          status = polled.status;
+        } catch (pollErr: any) {
+          if (vercelAbortRef.current) return;
+          // polling failed — deployment may still be live; fall through with URL
+          console.warn('[vercel-deploy] polling failed', pollErr);
+        }
+      }
+
+      if (vercelAbortRef.current) return;
+
+      setVercelUrl(finalUrl);
+      setVercelStatus(status === 'initializing' ? 'ready' : status);
+      toast.success(`Deployed to Vercel: ${finalUrl}`);
+    } catch (e: any) {
+      if (!vercelAbortRef.current) {
+        setVercelError(e.message ?? 'Vercel deploy failed');
+        setVercelStatus('error');
+      }
+    } finally {
+      setVercelLoading(false);
+    }
+  };
 
   useEffect(() => {
     // check for an existing session-connected GitHub account when dialog opens
@@ -360,6 +447,23 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
         <span className="hidden sm:inline">Export to GitHub</span>
       </button>
 
+      {/* One-click Deploy to Vercel — bundles WebContainer file tree (zip-export logic), POSTs Vercel deployment API, polls status + logs */}
+      <button
+        onClick={() => {
+          setVercelError(null);
+          setVercelUrl(null);
+          setVercelLogs([]);
+          setVercelOpen(true);
+          handleDeployVercel();
+        }}
+        disabled={vercelLoading}
+        className="inline-flex items-center gap-1 sm:gap-1.5 rounded-md border border-bolt-elements-borderColor bg-[#1c1c1c] hover:bg-[#242424] disabled:opacity-50 disabled:cursor-not-allowed px-2 sm:px-3 py-1.5 text-xs font-medium text-[#e8e8e8] transition-colors shrink-0"
+        title="One-click deploy: bundle the current WebContainer file tree and deploy it to Vercel"
+      >
+        <div className={vercelLoading ? 'i-svg-spinners:90-ring-with-bg text-sm' : 'i-simple-icons:vercel text-sm'} />
+        <span className="hidden sm:inline">{vercelLoading ? 'Deploying…' : 'Deploy to Vercel'}</span>
+      </button>
+
       {/* Deploy Dropdown — Vercel / Netlify / Cloudflare Pages (Cloudflare uses Direct Upload, separate from builder's own wrangler.toml) */}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
@@ -576,6 +680,99 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
                   </div>
                 </div>
               )}
+            </div>
+          </DialogDescription>
+        </Dialog>
+      </DialogRoot>
+
+      {/* Vercel Deploy Panel — live URL + deploy logs */}
+      <DialogRoot open={vercelOpen}>
+        <Dialog
+          onBackdrop={() => {
+            vercelAbortRef.current = true;
+            setVercelOpen(false);
+          }}
+          onClose={() => {
+            vercelAbortRef.current = true;
+            setVercelOpen(false);
+          }}
+          className="max-w-[560px]"
+        >
+          <DialogTitle>Deploy to Vercel</DialogTitle>
+          <DialogDescription asChild>
+            <div className="space-y-4">
+              <p className="text-[13px] leading-relaxed">
+                Bundling the current WebContainer file tree (reusing{' '}
+                <code className="px-1 py-0.5 rounded bg-[#242424] border border-[#2a2a2a]">zip-export.client.ts</code>{' '}
+                collection) and deploying via the Vercel Deployment API. Token is session-scoped via{' '}
+                <code className="px-1 py-0.5 rounded bg-[#242424] border border-[#2a2a2a]">bolt_session</code> (KV).
+              </p>
+
+              {vercelError && (
+                <div className="rounded-md border border-[#e5484d]/30 bg-[#e5484d]/10 px-3 py-2 text-xs text-[#ff9a9e]">
+                  {vercelError}
+                </div>
+              )}
+
+              {vercelUrl && !vercelError && (
+                <div className="rounded-md border border-[#2a7a2a]/30 bg-[#2a7a2a]/10 px-3 py-3">
+                  <p className="text-sm text-[#7fc87f]">✓ Deployed to Vercel</p>
+                  <a
+                    href={vercelUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm underline text-[#8a8a8a] hover:text-[#e8e8e8] break-all"
+                  >
+                    {vercelUrl}
+                  </a>
+                </div>
+              )}
+
+              {/* Deploy log panel */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-[#e8e8e8]">Deploy logs</span>
+                  <span className="text-[11px] text-[#5c5c5c]">
+                    {vercelLoading ? `Status: ${vercelStatus ?? 'initializing'} — polling…` : (vercelStatus ?? 'idle')}
+                  </span>
+                </div>
+                <div
+                  ref={vercelLogRef}
+                  className="h-[180px] overflow-y-auto rounded-md border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2 font-mono text-[11px] leading-[1.5] text-[#8a8a8a] whitespace-pre-wrap break-all"
+                >
+                  {vercelLogs.length === 0 ? (
+                    <span className="text-[#5c5c5c]">{vercelLoading ? 'Uploading files…' : 'No logs yet.'}</span>
+                  ) : (
+                    vercelLogs.map((line, i) => (
+                      <div key={`${i}-${line.slice(0, 24)}`} className="text-[#8a8a8a]">
+                        {line}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <DialogButton
+                  type="secondary"
+                  onClick={() => {
+                    vercelAbortRef.current = true;
+                    setVercelOpen(false);
+                  }}
+                >
+                  {vercelLoading ? 'Close (keeps deploying)' : 'Close'}
+                </DialogButton>
+                {vercelUrl && (
+                  <a
+                    href={vercelUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-[30px] items-center justify-center rounded-[6px] bg-[#1c1c1c] border border-[#2a2a2a] px-3.5 text-[13px] font-medium text-[#e8e8e8] hover:bg-[#242424]"
+                  >
+                    Open live URL
+                  </a>
+                )}
+              </div>
             </div>
           </DialogDescription>
         </Dialog>
