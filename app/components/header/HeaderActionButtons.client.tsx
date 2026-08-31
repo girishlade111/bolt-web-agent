@@ -156,6 +156,7 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
       setDeployError(null);
       setDeployUrl(null);
       setDeployOpen(true);
+
       return;
     }
 
@@ -163,31 +164,43 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
 
     try {
       const result =
-        provider === 'vercel'
-          ? await deployToVercel({ projectName })
-          : await deployToNetlify({ projectName });
+        provider === 'vercel' ? await deployToVercel({ projectName }) : await deployToNetlify({ projectName });
 
       let finalUrl = result.url ?? `https://${projectName}.${provider === 'vercel' ? 'vercel' : 'netlify'}.app`;
       let status = result.status;
 
       if (result.deploymentId && status === 'initializing') {
         setPanelStatus('building');
+
         try {
           const onLog = (line: string) => setPanelLogs((prev) => [...prev.slice(-499), line]);
           const polled =
             provider === 'vercel'
-              ? await pollVercelDeployment(result.deploymentId, projectName, { intervalMs: 3000, timeoutMs: 180000, onLog })
-              : await pollNetlifyDeployment(result.deploymentId, projectName, { intervalMs: 3000, timeoutMs: 180000, onLog });
+              ? await pollVercelDeployment(result.deploymentId, projectName, {
+                  intervalMs: 3000,
+                  timeoutMs: 180000,
+                  onLog,
+                })
+              : await pollNetlifyDeployment(result.deploymentId, projectName, {
+                  intervalMs: 3000,
+                  timeoutMs: 180000,
+                  onLog,
+                });
           finalUrl = polled.url || finalUrl;
           status = polled.status;
         } catch (pollErr: any) {
-          if (panelAbortRef.current) return;
+          if (panelAbortRef.current) {
+            return;
+          }
+
           // polling failed — deployment may still be live; fall through with URL
           console.warn(`[${provider}-deploy] polling failed`, pollErr);
         }
       }
 
-      if (panelAbortRef.current) return;
+      if (panelAbortRef.current) {
+        return;
+      }
 
       setPanelUrl(finalUrl);
       setPanelStatus(status === 'initializing' ? 'ready' : status);
@@ -707,7 +720,9 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
 
               {panelUrl && !panelError && (
                 <div className="rounded-md border border-[#2a7a2a]/30 bg-[#2a7a2a]/10 px-3 py-3">
-                  <p className="text-sm text-[#7fc87f]">✓ Deployed to {panelProvider === 'vercel' ? 'Vercel' : 'Netlify'}</p>
+                  <p className="text-sm text-[#7fc87f]">
+                    ✓ Deployed to {panelProvider === 'vercel' ? 'Vercel' : 'Netlify'}
+                  </p>
                   <a
                     href={panelUrl}
                     target="_blank"
@@ -724,7 +739,7 @@ export function HeaderActionButtons({}: HeaderActionButtonsProps) {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-[#e8e8e8]">Deploy logs</span>
                   <span className="text-[11px] text-[#5c5c5c]">
-                    {panelLoading ? `Status: ${panelStatus ?? 'initializing'} — polling…` : (panelStatus ?? 'idle')}
+                    {panelLoading ? `Status: ${panelStatus ?? 'initializing'} — polling…` : panelStatus ?? 'idle'}
                   </span>
                 </div>
                 <div

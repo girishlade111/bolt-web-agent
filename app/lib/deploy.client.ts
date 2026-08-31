@@ -20,15 +20,24 @@ export interface DeployResult {
 export async function getDeployToken(provider: DeployProvider): Promise<string | null> {
   try {
     const res = await fetchWithSession(`/api/deploy/token?provider=${provider}`);
-    if (!res.ok) return null;
+
+    if (!res.ok) {
+      return null;
+    }
+
     const data: any = await res.json();
+
     return data.token ?? null;
   } catch {
     return null;
   }
 }
 
-export async function setDeployToken(provider: DeployProvider, token: string, meta?: { accountId?: string }): Promise<void> {
+export async function setDeployToken(
+  provider: DeployProvider,
+  token: string,
+  meta?: { accountId?: string },
+): Promise<void> {
   await fetchWithSession('/api/deploy/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -57,7 +66,10 @@ export async function deployToCloudflare(opts: {
   token?: string;
 }): Promise<DeployResult> {
   const files = await getDeployFiles();
-  if (Object.keys(files).length === 0) throw new Error('No files to deploy. Generate an app first.');
+
+  if (Object.keys(files).length === 0) {
+    throw new Error('No files to deploy. Generate an app first.');
+  }
 
   const body: any = {
     provider: 'cloudflare',
@@ -65,8 +77,11 @@ export async function deployToCloudflare(opts: {
     accountId: opts.accountId,
     files,
   };
-  // Prefer stored token via session, but allow override from dialog
-  if (opts.token) body.token = opts.token;
+
+  // prefer stored token via session, but allow override from dialog
+  if (opts.token) {
+    body.token = opts.token;
+  }
 
   const res = await fetchWithSession('/api/deploy/cloudflare', {
     method: 'POST',
@@ -74,7 +89,11 @@ export async function deployToCloudflare(opts: {
     body: JSON.stringify(body),
   });
   const data: any = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `Cloudflare deploy failed: ${res.status}`);
+
+  if (!res.ok) {
+    throw new Error(data.error ?? `Cloudflare deploy failed: ${res.status}`);
+  }
+
   return data as DeployResult;
 }
 
@@ -86,7 +105,11 @@ export async function deployToVercel(opts: { projectName: string; token?: string
     body: JSON.stringify({ provider: 'vercel', projectName: opts.projectName, token: opts.token, files }),
   });
   const data: any = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `Vercel deploy failed: ${res.status}`);
+
+  if (!res.ok) {
+    throw new Error(data.error ?? `Vercel deploy failed: ${res.status}`);
+  }
+
   return data;
 }
 
@@ -98,7 +121,11 @@ export async function deployToNetlify(opts: { projectName: string; token?: strin
     body: JSON.stringify({ provider: 'netlify', projectName: opts.projectName, token: opts.token, files }),
   });
   const data: any = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `Netlify deploy failed: ${res.status}`);
+
+  if (!res.ok) {
+    throw new Error(data.error ?? `Netlify deploy failed: ${res.status}`);
+  }
+
   return data;
 }
 
@@ -116,12 +143,17 @@ export async function pollVercelDeployment(
   const timeout = opts.timeoutMs ?? 180000;
   const seen = new Set<string>();
   const start = Date.now();
+
   while (Date.now() - start < timeout) {
     const res = await fetchWithSession(
       `/api/deploy/vercel?deploymentId=${encodeURIComponent(deploymentId)}&projectName=${encodeURIComponent(projectName)}`,
     );
     const data: any = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error ?? `Vercel status check failed: ${res.status}`);
+
+    if (!res.ok) {
+      throw new Error(data.error ?? `Vercel status check failed: ${res.status}`);
+    }
+
     if (Array.isArray(data.logs)) {
       for (const line of data.logs) {
         if (typeof line === 'string' && !seen.has(line)) {
@@ -130,8 +162,15 @@ export async function pollVercelDeployment(
         }
       }
     }
-    if (data.status === 'ready' || data.status === 'success') return data as DeployResult;
-    if (data.status === 'error' || data.status === 'failed') throw new Error(data.error ?? 'Vercel deployment failed');
+
+    if (data.status === 'ready' || data.status === 'success') {
+      return data as DeployResult;
+    }
+
+    if (data.status === 'error' || data.status === 'failed') {
+      throw new Error(data.error ?? 'Vercel deployment failed');
+    }
+
     await new Promise((r) => setTimeout(r, interval));
   }
   throw new Error('Vercel deployment polling timed out');
@@ -151,12 +190,17 @@ export async function pollNetlifyDeployment(
   const timeout = opts.timeoutMs ?? 180000;
   const seen = new Set<string>();
   const start = Date.now();
+
   while (Date.now() - start < timeout) {
     const res = await fetchWithSession(
       `/api/deploy/netlify?deploymentId=${encodeURIComponent(deploymentId)}&projectName=${encodeURIComponent(projectName)}`,
     );
     const data: any = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error ?? `Netlify status check failed: ${res.status}`);
+
+    if (!res.ok) {
+      throw new Error(data.error ?? `Netlify status check failed: ${res.status}`);
+    }
+
     if (Array.isArray(data.logs)) {
       for (const line of data.logs) {
         if (typeof line === 'string' && !seen.has(line)) {
@@ -165,8 +209,15 @@ export async function pollNetlifyDeployment(
         }
       }
     }
-    if (data.status === 'ready' || data.status === 'success') return data as DeployResult;
-    if (data.status === 'error' || data.status === 'failed') throw new Error(data.error ?? 'Netlify deployment failed');
+
+    if (data.status === 'ready' || data.status === 'success') {
+      return data as DeployResult;
+    }
+
+    if (data.status === 'error' || data.status === 'failed') {
+      throw new Error(data.error ?? 'Netlify deployment failed');
+    }
+
     await new Promise((r) => setTimeout(r, interval));
   }
   throw new Error('Netlify deployment polling timed out');
@@ -185,12 +236,25 @@ export async function pollDeploymentStatus(
   const interval = opts.intervalMs ?? 2000;
   const timeout = opts.timeoutMs ?? 60000;
   const start = Date.now();
+
   while (Date.now() - start < timeout) {
-    const res = await fetchWithSession(`/api/deploy/${provider}?deploymentId=${encodeURIComponent(deploymentId)}&projectName=${encodeURIComponent(projectName)}`);
+    const res = await fetchWithSession(
+      `/api/deploy/${provider}?deploymentId=${encodeURIComponent(deploymentId)}&projectName=${encodeURIComponent(projectName)}`,
+    );
     const data: any = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error ?? `Status check failed: ${res.status}`);
-    if (data.status === 'ready' || data.status === 'success' || data.url) return data as DeployResult;
-    if (data.status === 'error' || data.status === 'failed') throw new Error(data.error ?? 'Deployment failed');
+
+    if (!res.ok) {
+      throw new Error(data.error ?? `Status check failed: ${res.status}`);
+    }
+
+    if (data.status === 'ready' || data.status === 'success' || data.url) {
+      return data as DeployResult;
+    }
+
+    if (data.status === 'error' || data.status === 'failed') {
+      throw new Error(data.error ?? 'Deployment failed');
+    }
+
     await new Promise((r) => setTimeout(r, interval));
   }
   throw new Error('Deployment polling timed out');
