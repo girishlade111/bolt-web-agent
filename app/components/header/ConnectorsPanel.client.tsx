@@ -3,7 +3,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { toast } from 'react-toastify';
 import { workbenchStore } from '~/lib/stores/workbench';
 import { classNames } from '~/utils/classNames';
-import { connectGitHub, disconnectGitHub, getGitHubConnection } from '~/lib/github.client';
+import { connectGitHub, disconnectGitHub, getGitHubConnection, pushToGitHub, collectFiles } from '~/lib/github.client';
 import {
   getDeployToken,
   setDeployToken,
@@ -14,7 +14,10 @@ import {
   pollDeploymentStatus,
   pollVercelDeployment,
   pollNetlifyDeployment,
+  listConnectorResources,
+  deleteConnectorResource,
   type DeployProvider,
+  type ConnectorResource,
 } from '~/lib/deploy.client';
 
 /**
@@ -123,6 +126,19 @@ export function ConnectorsPanel() {
   const [deployLogs, setDeployLogs] = useState<string[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef(false);
+
+  // ---------- resource management (list / edit / delete) ----------
+  // One provider's resource list is expanded at a time.
+  const [manageProvider, setManageProvider] = useState<ConnectorId | null>(null);
+  const [resLoading, setResLoading] = useState(false);
+  const [resError, setResError] = useState<string | null>(null);
+  const [resources, setResources] = useState<ConnectorResource[]>([]);
+  // delete confirmation: two-step type-to-confirm (deletes real external resources)
+  const [deleteTarget, setDeleteTarget] = useState<ConnectorResource | null>(null);
+  const [confirmInput, setConfirmInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [busyResource, setBusyResource] = useState<string | null>(null); // per-row push busy marker
+
 
   // auto-scroll deploy log area
   useEffect(() => {
@@ -250,7 +266,161 @@ export function ConnectorsPanel() {
     }
   };
 
-  // ---------- deploy action (same client helpers + polling as before) ----------
+  // ---------- resource management handlers (list / edit / delete) ----------
+
+  const loadResources = async (provider: ConnectorId) => {
+    setManageProvider(provider);
+    setResLoading(true);
+    setResError(null);
+    setResources([]);
+    setDeleteTarget(null);
+    setConfirmInput('');
+
+    try {
+      setResources(await listConnectorResources(provider));
+    } catch (e: any) {
+      setResError(e?.message ?? 'Failed to load resources');
+    } finally {
+      setResLoading(false);
+    }
+  };
+
+  const toggleManage = (provider: ConnectorId) => {
+    if (manageProvider === provider) {
+      setManageProvider(null);
+      setDeleteTarget(null);
+      setConfirmInput('');
+    } else {
+      loadResources(provider);
+    }
+  };
+
+  /**
+   * Edit — re-deploy an existing deploy-target project (push new build) instead
+   * of creating a new one. Vercel/Cloudflare attach to the project by name;
+   * Netlify redeploys into the existing site via siteId.
+   */
+  const handleEditResource = async (provider: DeployProvider, resource: ConnectorResource) => {
+    setDeployError(null);
+    setDeployUrl(null);
+    setDeployLogs([]);
+    setDeployStatus('initializing');
+    setDeployingProvider(provider);
+    abortRef.current = false;
+
+    const projectName = resource.name;
+    const onLog = (line: string) => setDeployLogs((prev) => [...prev.slice(-499), line]);
+
+    try {
+      let result: any;
+
+      if (provider === 'cloudflare') {
+        result = await deployToCloudflare({ projectName });
+      } else if (provider === 'vercel') {
+        result = await deployToVercel({ projectName });
+      } else {
+        result = await deployToNetlify({ projectName, siteId: resource.id });
+      }
+
+      let finalUrl = result.url;
+      const deploymentId = result.deploymentId;
+      let status = result.status;
+
+      if (status === 'initializing' && deploymentId) {
+        setDeployStatus('building');
+
+        try {
+          const polled =
+            provider === 'cloudflare'
+              ? await pollDeploymentStatus(provider, deploymentId, projectName, {
+                  intervalMs: 2000,
+                  timeoutMs: 60000,
+                })
+              : provider === 'vercel'
+                ? await pollVercelDeployment(deploymentId, projectName, { intervalMs: 3000, timeoutMs: 180000, onLog })
+                : await pollNetlifyDeployment(deploymentId, projectName, {
+                    intervalMs: 3000,
+                    timeoutMs: 180000,
+                    onLog,
+                  });
+
+          finalUrl = polled.url || finalUrl;
+          status = polled.status;
+        } catch (pollErr: any) {
+          if (abortRef.current) {
+            return;
+          }
+
+          setDeployError(pollErr?.message ?? 'Deployment polling failed');
+          setDeployStatus(null);
+          return;
+        }
+      }
+
+      if (abortRef.current) {
+        return;
+      }
+
+      setDeployUrl(finalUrl);
+      setDeployStatus(status === 'error' ? null : 'done');
+      toast.success(`Re-deployed ${resource.name} to ${CONNECTORS.find((c) => c.id === provider)?.label}`);
+    } catch (e: any) {
+      setDeployError(e?.message ?? 'Re-deploy failed');
+      setDeployStatus(null);
+    } finally {
+      if (!abortRef.current) {
+        setDeployingProvider(null);
+      }
+    }
+  };
+
+  /** Edit — push the current WebContainer file tree to an existing GitHub repo. */
+  const handlePushToRepo = async (resource: ConnectorResource) => {
+    setBusyResource(resource.id);
+    setResError(null);
+
+    try {
+      const files = collectFiles();
+
+      if (Object.keys(files).length === 0) {
+        throw new Error('No files to push. Generate an app first.');
+      }
+
+      const result = await pushToGitHub({ repoName: resource.name, existingRepo: true, files });
+      toast.success(`Pushed ${result.filesPushed} files to ${result.repoUrl}`);
+    } catch (e: any) {
+      setResError(e?.message ?? 'Push to repo failed');
+    } finally {
+      setBusyResource(null);
+    }
+  };
+
+  /** Delete — destructive; requires type-to-confirm, audit-logged server-side. */
+  const handleDeleteResource = async (resource: ConnectorResource) => {
+    if (!manageProvider) {
+      return;
+    }
+
+    setDeleting(true);
+
+    try {
+      await deleteConnectorResource({
+        provider: manageProvider,
+        id: resource.id,
+        name: resource.name,
+        confirmName: confirmInput,
+      });
+      toast.success(`Deleted ${resource.name}`);
+      setDeleteTarget(null);
+      setConfirmInput('');
+      await loadResources(manageProvider);
+    } catch (e: any) {
+      toast.error(e?.message ?? 'Delete failed');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
 
   const handleDeploy = async (provider: DeployProvider) => {
     setDeployError(null);
@@ -419,6 +589,19 @@ export function ConnectorsPanel() {
           {state.connected ? (
             <>
               <button
+                onClick={() => toggleManage(provider)}
+                disabled={deployingProvider !== null}
+                className={classNames(
+                  'inline-flex h-[26px] items-center gap-1 rounded-[6px] border px-2.5 text-[11px] font-medium transition-colors',
+                  manageProvider === provider
+                    ? 'border-[#6b6bff]/50 bg-[#6b6bff]/10 text-[#a3a3ff]'
+                    : 'border-[#2a2a2a] bg-[#1c1c1c] text-[#e8e8e8] hover:bg-[#242424]',
+                )}
+              >
+                <div className="i-ph:list-dashes text-xs" />
+                Manage
+              </button>
+              <button
                 onClick={() => handleDisconnectProvider(provider)}
                 disabled={deployingProvider !== null}
                 className="inline-flex h-[26px] items-center rounded-[6px] border border-[#e5484d]/40 bg-[#1c1c1c] hover:bg-[#2a1a1a] disabled:opacity-50 disabled:cursor-not-allowed px-2.5 text-[11px] font-medium text-[#ff9a9e] transition-colors"
@@ -454,6 +637,157 @@ export function ConnectorsPanel() {
 
         {/* shared deploy progress for this provider */}
         {isDeploying && <DeployProgress status={deployStatus} error={deployError} logs={deployLogs} logRef={logRef} />}
+
+        {renderResourceSection(provider, c.label)}
+      </div>
+    );
+  };
+
+  /** Shared resource list UI (rendered inside a connected connector's row). */
+  const renderResourceSection = (provider: ConnectorId, label: string) => {
+    if (manageProvider !== provider) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-2 rounded-md border border-[#2a2a2a] bg-[#141414] p-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-medium text-[#e8e8e8]">Your {label} resources</span>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => loadResources(provider)}
+              disabled={resLoading || deleting}
+              className="inline-flex h-[22px] items-center rounded-[6px] border border-[#2a2a2a] bg-[#1c1c1c] hover:bg-[#242424] disabled:opacity-50 px-2 text-[10px] text-[#e8e8e8] transition-colors"
+            >
+              Refresh
+            </button>
+            <button
+              onClick={() => {
+                setManageProvider(null);
+                setDeleteTarget(null);
+                setConfirmInput('');
+              }}
+              className="inline-flex h-[22px] items-center rounded-[6px] border border-[#2a2a2a] bg-[#1c1c1c] hover:bg-[#242424] px-2 text-[10px] text-[#8a8a8a] transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        {resLoading && (
+          <p className="flex items-center gap-1.5 text-[10px] text-[#8a8a8a]">
+            <div className="i-svg-spinners:90-ring-with-bg text-xs" />
+            Loading resources…
+          </p>
+        )}
+
+        {resError && <p className="text-[10px] text-[#ff9a9e]">{resError}</p>}
+
+        {!resLoading && !resError && resources.length === 0 && (
+          <p className="text-[10px] text-[#5c5c5c]">No existing resources found on this account.</p>
+        )}
+
+        {resources.map((r) => (
+          <div key={`${provider}-${r.id}`} className="space-y-1.5 rounded border border-[#242424] bg-[#101010] px-2 py-1.5">
+            <div className="flex items-center justify-between gap-2">
+              {r.url ? (
+                <a
+                  href={r.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="truncate text-[11px] text-[#6b6bff] hover:text-[#8a8aff] hover:underline"
+                >
+                  {r.name}
+                </a>
+              ) : (
+                <span className="truncate text-[11px] text-[#e8e8e8]">{r.name}</span>
+              )}
+              <span className="shrink-0 text-[10px] text-[#5c5c5c]">
+                {r.updatedAt ? new Date(r.updatedAt).toLocaleDateString() : r.kind}
+              </span>
+            </div>
+
+            {deleteTarget?.id === r.id ? (
+              <div className="space-y-1.5 rounded border border-[#e5484d]/40 bg-[#e5484d]/5 p-2">
+                <p className="text-[10px] leading-relaxed text-[#ff9a9e]">
+                  This permanently deletes <strong className="text-[#e8e8e8]">{r.name}</strong> from {label}. This cannot
+                  be undone. Type the resource name to confirm:
+                </p>
+                <input
+                  value={confirmInput}
+                  onChange={(e) => setConfirmInput(e.target.value)}
+                  placeholder={r.name}
+                  autoFocus
+                  className="h-[26px] w-full rounded border border-[#2a2a2a] bg-[#0d0d0d] px-2 font-mono text-[11px] text-[#e8e8e8] placeholder:text-[#4a4a4a] focus:border-[#e5484d]/60 focus:outline-none"
+                />
+                <div className="flex justify-end gap-1.5">
+                  <button
+                    onClick={() => {
+                      setDeleteTarget(null);
+                      setConfirmInput('');
+                    }}
+                    disabled={deleting}
+                    className="inline-flex h-[24px] items-center rounded-[6px] border border-[#2a2a2a] bg-[#1c1c1c] hover:bg-[#242424] disabled:opacity-50 px-2 text-[10px] text-[#e8e8e8] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDeleteResource(r)}
+                    disabled={confirmInput !== r.name || deleting}
+                    className="inline-flex h-[24px] items-center rounded-[6px] bg-[#e5484d] hover:bg-[#ff5a5f] disabled:cursor-not-allowed disabled:opacity-40 px-2 text-[10px] font-medium text-white transition-colors"
+                  >
+                    {deleting ? 'Deleting…' : `Delete ${r.name}`}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-end gap-1.5">
+                {provider === 'github' ? (
+                  <button
+                    onClick={() => handlePushToRepo(r)}
+                    disabled={busyResource === r.id || deleting}
+                    className="inline-flex h-[24px] items-center gap-1 rounded-[6px] bg-[#242424] hover:bg-[#2e2e2e] disabled:opacity-50 px-2 text-[10px] font-medium text-[#e8e8e8] transition-colors"
+                    title={`Push the current project files to ${r.name}`}
+                  >
+                    <div
+                      className={classNames(
+                        busyResource === r.id ? 'i-svg-spinners:90-ring-with-bg' : 'i-ph:upload-simple',
+                        'text-[10px]',
+                      )}
+                    />
+                    {busyResource === r.id ? 'Pushing…' : 'Push'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleEditResource(provider as DeployProvider, r)}
+                    disabled={deployingProvider !== null || deleting}
+                    className="inline-flex h-[24px] items-center gap-1 rounded-[6px] bg-[#242424] hover:bg-[#2e2e2e] disabled:cursor-not-allowed disabled:opacity-50 px-2 text-[10px] font-medium text-[#e8e8e8] transition-colors"
+                    title={`Re-deploy the current project to the existing ${label} project "${r.name}"`}
+                  >
+                    <div className="i-ph:arrow-clockwise text-[10px]" />
+                    Re-deploy
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setDeleteTarget(r);
+                    setConfirmInput('');
+                  }}
+                  disabled={deleting || busyResource === r.id}
+                  className="inline-flex h-[24px] items-center rounded-[6px] border border-[#e5484d]/40 bg-[#1c1c1c] hover:bg-[#2a1a1a] disabled:opacity-50 px-2 text-[10px] font-medium text-[#ff9a9e] transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+
+        <p className="text-[10px] leading-relaxed text-[#5c5c5c]">
+          Deletes are real and irreversible — they are logged server-side (provider, resource id, timestamp) for
+          accountability.
+        </p>
+
       </div>
     );
   };
@@ -517,6 +851,20 @@ export function ConnectorsPanel() {
 
       {/* action buttons */}
       <div className="flex items-center justify-end gap-2">
+        {ghConnected && (
+          <button
+            onClick={() => toggleManage('github')}
+            className={classNames(
+              'inline-flex h-[26px] items-center gap-1 rounded-[6px] border px-2.5 text-[11px] font-medium transition-colors',
+              manageProvider === 'github'
+                ? 'border-[#6b6bff]/50 bg-[#6b6bff]/10 text-[#a3a3ff]'
+                : 'border-[#2a2a2a] bg-[#1c1c1c] text-[#e8e8e8] hover:bg-[#242424]',
+            )}
+          >
+            <div className="i-ph:list-dashes text-xs" />
+            Manage
+          </button>
+        )}
         {ghConnected ? (
           <button
             onClick={handleDisconnectGitHub}
@@ -536,6 +884,8 @@ export function ConnectorsPanel() {
           )
         )}
       </div>
+
+      {renderResourceSection('github', 'GitHub')}
 
       <p className="text-[10px] leading-relaxed text-[#5c5c5c]">
         OAuth Device Flow — token stored server-side, keyed to your{' '}

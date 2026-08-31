@@ -6,6 +6,8 @@ type GithubPushBody = {
   repoName: string;
   description?: string;
   private?: boolean;
+  existingRepo?: boolean; // push to an existing repo instead of creating a new one
+  owner?: string; // repo owner when existingRepo is true
   files: Record<string, string>;
 };
 
@@ -107,7 +109,18 @@ export async function action({ request, context }: ActionFunctionArgs) {
     return json({ error: 'No files to push. WebContainer file tree is empty.' }, { status: 400 });
   }
 
-  const repoName = sanitizeRepoName(repoNameRaw);
+  // existing-repo push: repoName may be "owner/repo" or owner supplied separately
+  const isExistingRepo = Boolean(body.existingRepo);
+  let ownerFromName: string | undefined;
+  let repoNameForExisting = repoNameRaw ?? '';
+
+  if (isExistingRepo && repoNameForExisting.includes('/')) {
+    const [o, ...rest] = repoNameForExisting.split('/');
+    ownerFromName = o.trim();
+    repoNameForExisting = rest.join('/');
+  }
+
+  const repoName = isExistingRepo ? repoNameForExisting : sanitizeRepoName(repoNameRaw);
   const description = body.description?.slice(0, 350) ?? 'Exported from LS Build — AI Application Builder';
   const isPrivate = Boolean(body.private);
 
@@ -120,48 +133,63 @@ export async function action({ request, context }: ActionFunctionArgs) {
   }
 
   const user: any = await userRes.json();
-  const owner: string = user.login;
+  const owner: string = isExistingRepo ? (body.owner?.trim() || ownerFromName || user.login) : user.login;
 
-  // create repo
-  const createRes = await githubFetch('https://api.github.com/user/repos', token, {
-    method: 'POST',
-    body: JSON.stringify({
-      name: repoName,
-      description,
-      private: isPrivate,
-      auto_init: false,
-    }),
-  });
-
+  // create repo (skipped entirely when pushing to an existing repo)
   let repo: any = null;
   let repoHtmlUrl = '';
 
-  if (createRes.ok) {
-    repo = await createRes.json();
+  if (isExistingRepo) {
+    // verify the existing repo exists and is accessible with this token
+    const existingRes = await githubFetch(`https://api.github.com/repos/${owner}/${repoName}`, token);
+
+    if (!existingRes.ok) {
+      throw json(
+        { error: `Existing repo "${owner}/${repoName}" not found or not accessible with the connected token.` },
+        { status: 404 },
+      );
+    }
+
+    repo = await existingRes.json();
     repoHtmlUrl = repo.html_url;
-  } else if (createRes.status === 422) {
-    const errBody = await createRes.text().catch(() => '');
+  } else {
+    const createRes = await githubFetch('https://api.github.com/user/repos', token, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: repoName,
+        description,
+        private: isPrivate,
+        auto_init: false,
+      }),
+    });
 
-    // repo already exists — try to use the existing repo (push will update)
-    if (errBody.includes('already exists') || errBody.includes('name already exists')) {
-      // fetch existing repo to get html_url
-      const existingRes = await githubFetch(`https://api.github.com/repos/${owner}/${repoName}`, token);
+    if (createRes.ok) {
+      repo = await createRes.json();
+      repoHtmlUrl = repo.html_url;
+    } else if (createRes.status === 422) {
+      const errBody = await createRes.text().catch(() => '');
 
-      if (existingRes.ok) {
-        repo = await existingRes.json();
-        repoHtmlUrl = repo.html_url;
+      // repo already exists — try to use the existing repo (push will update)
+      if (errBody.includes('already exists') || errBody.includes('name already exists')) {
+        // fetch existing repo to get html_url
+        const existingRes = await githubFetch(`https://api.github.com/repos/${owner}/${repoName}`, token);
+
+        if (existingRes.ok) {
+          repo = await existingRes.json();
+          repoHtmlUrl = repo.html_url;
+        } else {
+          throw json(
+            { error: `Repo "${repoName}" already exists and could not be fetched. Try a different name.` },
+            { status: 409 },
+          );
+        }
       } else {
-        throw json(
-          { error: `Repo "${repoName}" already exists and could not be fetched. Try a different name.` },
-          { status: 409 },
-        );
+        throw json({ error: `Failed to create repo: ${createRes.status} ${errBody.slice(0, 500)}` }, { status: 400 });
       }
     } else {
+      const errBody = await createRes.text().catch(() => '');
       throw json({ error: `Failed to create repo: ${createRes.status} ${errBody.slice(0, 500)}` }, { status: 400 });
     }
-  } else {
-    const errBody = await createRes.text().catch(() => '');
-    throw json({ error: `Failed to create repo: ${createRes.status} ${errBody.slice(0, 500)}` }, { status: 400 });
   }
 
   // filter files: skip node_modules, .git, and huge files
@@ -261,7 +289,9 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const commitRes = await githubFetch(`https://api.github.com/repos/${owner}/${repoName}/git/commits`, token, {
       method: 'POST',
       body: JSON.stringify({
-        message: 'Initial commit from LS Build (WebContainer export)',
+        message: isExistingRepo
+          ? `Update from LS Build — pushed to existing repo ${owner}/${repoName}`
+          : 'Initial commit from LS Build (WebContainer export)',
         tree: tree.sha,
         parents,
       }),

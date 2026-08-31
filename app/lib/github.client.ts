@@ -166,9 +166,11 @@ export function collectFiles(): Record<string, string> {
 
 export async function pushToGitHub(opts: {
   token?: string; // optional — server falls back to session-connected GitHub token
-  repoName: string;
+  repoName: string; // "owner/repo" when existingRepo is true
   description?: string;
   private?: boolean;
+  existingRepo?: boolean; // push to an existing repo instead of creating a new one
+  owner?: string; // repo owner when existingRepo is true
   files: Record<string, string>;
 }): Promise<{ repoUrl: string; branch: string; filesPushed: number }> {
   const res = await fetchWithSession('/api/github/push', {

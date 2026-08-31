@@ -222,30 +222,49 @@ export async function action({ request, context }: ActionFunctionArgs) {
   }
 
   // real Netlify API: create-or-get site → digest deploy → upload required files
+  // if body.siteId is provided, redeploy into that existing site instead of creating a new one
   try {
-    // create site (fall back to a suffixed name if the desired one is taken)
     let site: any = undefined;
-    const nameCandidates = [projectName, `${projectName}-${Date.now().toString(36).slice(-5)}`];
-    let lastErr = '';
+    const existingSiteId = body.siteId ? String(body.siteId).trim() : '';
 
-    for (const name of nameCandidates) {
-      const siteRes = await fetch('https://api.netlify.com/api/v1/sites', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+    if (existingSiteId) {
+      const siteRes = await fetch(`https://api.netlify.com/api/v1/sites/${encodeURIComponent(existingSiteId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (siteRes.ok) {
-        site = await siteRes.json();
-        break;
+      if (!siteRes.ok) {
+        const errData: any = await siteRes.json().catch(() => ({}));
+        throw json(
+          { error: errData?.message ?? `Existing site "${existingSiteId}" not found or not accessible: ${siteRes.status}` },
+          { status: 404, headers },
+        );
       }
 
-      const errData: any = await siteRes.json().catch(() => ({}));
-      lastErr = errData?.message ?? String(siteRes.status);
-    }
+      site = await siteRes.json();
+    } else {
+      // create site (fall back to a suffixed name if the desired one is taken)
+      const nameCandidates = [projectName, `${projectName}-${Date.now().toString(36).slice(-5)}`];
+      let lastErr = '';
 
-    if (!site) {
-      throw json({ error: `Netlify site creation failed: ${lastErr}` }, { status: 502, headers });
+      for (const name of nameCandidates) {
+        const siteRes = await fetch('https://api.netlify.com/api/v1/sites', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+
+        if (siteRes.ok) {
+          site = await siteRes.json();
+          break;
+        }
+
+        const errData: any = await siteRes.json().catch(() => ({}));
+        lastErr = errData?.message ?? String(siteRes.status);
+      }
+
+      if (!site) {
+        throw json({ error: `Netlify site creation failed: ${lastErr}` }, { status: 502, headers });
+      }
     }
 
     const siteId: string = site.id;

@@ -60,6 +60,52 @@ export async function getDeployFiles(): Promise<Record<string, string>> {
   return collectWebContainerFiles();
 }
 
+// ---------- connector resource management (list / delete, session-scoped) ----------
+
+export interface ConnectorResource {
+  id: string;
+  name: string;
+  kind: 'repo' | 'project' | 'site';
+  url: string | null;
+  updatedAt: string | null;
+  meta?: Record<string, string>;
+}
+
+export async function listConnectorResources(provider: 'github' | DeployProvider): Promise<ConnectorResource[]> {
+  const res = await fetchWithSession(`/api/connectors/resources?provider=${encodeURIComponent(provider)}`);
+  const data: any = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data.error ?? `Failed to list ${provider} resources: ${res.status}`);
+  }
+
+  return Array.isArray(data.resources) ? data.resources : [];
+}
+
+/**
+ * Destructive delete of an external resource. confirmName must exactly match the
+ * resource name (the server enforces this too). Every delete is audit-logged
+ * server-side (KV `audit:delete:*`) for accountability.
+ */
+export async function deleteConnectorResource(opts: {
+  provider: 'github' | DeployProvider;
+  id: string;
+  name: string;
+  confirmName: string;
+}): Promise<void> {
+  const res = await fetchWithSession('/api/connectors/resources', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'delete', provider: opts.provider, id: opts.id, name: opts.name, confirmName: opts.confirmName }),
+  });
+  const data: any = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data.error ?? `Delete failed: ${res.status}`);
+  }
+}
+
+
 export async function deployToCloudflare(opts: {
   projectName: string;
   accountId?: string;
@@ -113,12 +159,12 @@ export async function deployToVercel(opts: { projectName: string; token?: string
   return data;
 }
 
-export async function deployToNetlify(opts: { projectName: string; token?: string }): Promise<DeployResult> {
+export async function deployToNetlify(opts: { projectName: string; token?: string; siteId?: string }): Promise<DeployResult> {
   const files = await getDeployFiles();
   const res = await fetchWithSession('/api/deploy/netlify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ provider: 'netlify', projectName: opts.projectName, token: opts.token, files }),
+    body: JSON.stringify({ provider: 'netlify', projectName: opts.projectName, token: opts.token, siteId: opts.siteId, files }),
   });
   const data: any = await res.json().catch(() => ({}));
 
