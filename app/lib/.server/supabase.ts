@@ -1,4 +1,145 @@
 /**
+ * Supabase Management API — shared server helpers.
+ *
+ * Same bolt_session pattern as github:token:{sid} / deploy:token:{provider}:{sid}:
+ * the OAuth access + refresh tokens are stored server-side in KV under
+ * `supabase:token:{sessionId}` and never exposed to the client. The linked
+ * project is stored under `supabase:project:{sessionId}`.
+ */
+
+export function getKv(env: Env): KVNamespace | undefined {
+  const anyEnv = env as any;
+  return anyEnv.DEPLOY_TOKENS_KV ?? anyEnv.DEPLOY_KV ?? anyEnv.SUPABASE_KV ?? anyEnv.RATE_LIMIT_KV;
+}
+
+export function getClientId(env: Env): string | undefined {
+  return (env as any).SUPABASE_CLIENT_ID ?? (import.meta.env as any).VITE_SUPABASE_CLIENT_ID ?? undefined;
+}
+
+export function getClientSecret(env: Env): string | undefined {
+  return (env as any).SUPABASE_CLIENT_SECRET ?? undefined;
+}
+
+export function supabaseTokenKey(sessionId: string): string {
+  return `supabase:token:${sessionId}`;
+}
+
+export function supabaseProjectKey(sessionId: string): string {
+  return `supabase:project:${sessionId}`;
+}
+
+export function supabaseHeaders(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+export interface StoredSupabaseAuth {
+  token: string;
+  refreshToken?: string;
+  expiresAt?: string; // ISO timestamp
+  email?: string | null;
+  updatedAt: string;
+}
+
+export async function readSupabaseAuth(env: Env, sessionId: string): Promise<StoredSupabaseAuth | null> {
+  const kv = getKv(env);
+
+  if (!kv) {
+    return null;
+  }
+
+  try {
+    const raw = await kv.get(supabaseTokenKey(sessionId), 'text');
+
+    if (!raw) {
+      return null;
+    }
+
+    return JSON.parse(raw) as StoredSupabaseAuth;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Returns a valid access token for this session, transparently refreshing it
+ * via the refresh token when it's expired (or about to expire within 60s).
+ */
+export async function getSupabaseToken(env: Env, sessionId: string): Promise<string | null> {
+  const auth = await readSupabaseAuth(env, sessionId);
+
+  if (!auth?.token) {
+    return null;
+  }
+
+  const expiresSoon = auth.expiresAt ? new Date(auth.expiresAt).getTime() - Date.now() < 60_000 : false;
+
+  if (!expiresSoon || !auth.refreshToken) {
+    return auth.token;
+  }
+
+  const clientId = getClientId(env);
+  const clientSecret = getClientSecret(env);
+
+  if (!clientId || !clientSecret) {
+    return auth.token;
+  }
+
+  try {
+    const res = await fetch('https://api.supabase.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: auth.refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    });
+    const data: any = await res.json().catch(() => ({}));
+
+    if (!res.ok || !data.access_token) {
+      return auth.token; // fall back to the possibly-stale token
+    }
+
+    const updated: StoredSupabaseAuth = {
+      token: data.access_token,
+      refreshToken: data.refresh_token ?? auth.refreshToken,
+      expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000).toISOString() : auth.expiresAt,
+      email: auth.email,
+      updatedAt: new Date().toISOString(),
+    };
+    const kv = getKv(env);
+
+    if (kv) {
+      await kv.put(supabaseTokenKey(sessionId), JSON.stringify(updated), { expirationTtl: 60 * 60 * 24 * 30 });
+    }
+
+    return updated.token;
+  } catch {
+    return auth.token;
+  }
+}
+
+/**
+ * Runs a read-only SQL statement against the linked project's database via the
+ * Management API query endpoint. Only used for schema introspection.
+ */
+export async function runSupabaseQuery(token: string, projectRef: string, query: string): Promise<any> {
+  const res = await fetch(`https://api.supabase.com/v1/projects/${encodeURIComponent(projectRef)}/database/query`, {
+    method: 'POST',
+    headers: supabaseHeaders(token),
+    body: JSON.stringify({ query }),
+  });
+  const data: any = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data?.message ?? data?.error ?? `Supabase query failed: ${res.status}`);
+  }
+
+  return data;
+}
+
+/**
  * Supabase project auto-provisioning — session-scoped, Management API backed.
  * - Detection: keyword heuristic on prompt + explicit user toggle.
  * - Storage: Cloudflare KV (SUPABASE_KV → RATE_LIMIT_KV fallback → in-memory) keyed by session ID.

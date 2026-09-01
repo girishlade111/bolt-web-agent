@@ -19,6 +19,18 @@ import {
   type DeployProvider,
   type ConnectorResource,
 } from '~/lib/deploy.client';
+import {
+  getSupabaseConnection,
+  connectSupabase,
+  disconnectSupabase,
+  getLinkedSupabaseProject,
+  linkSupabaseProject,
+  unlinkSupabaseProject,
+  getSupabaseSchema,
+  applySupabaseSchemaOp,
+  type SupabaseLinkedProject,
+  type SupabaseTable,
+} from '~/lib/supabase.client';
 
 /**
  * Unified "Connectors" panel — one consistent UI for GitHub / Vercel / Netlify / Cloudflare.
@@ -34,7 +46,8 @@ import {
  *  - Deploy action (deploy targets only, enabled once connected)
  */
 
-type ConnectorId = 'github' | DeployProvider;
+type ConnectorId = 'github' | 'supabase' | DeployProvider;
+type ManageableId = ConnectorId;
 
 const CONNECTORS: Array<{
   id: ConnectorId;
@@ -48,6 +61,13 @@ const CONNECTORS: Array<{
     id: 'github',
     label: 'GitHub',
     icon: 'i-ph:github-logo',
+    isDeployTarget: false,
+    tokenPlaceholder: '',
+  },
+  {
+    id: 'supabase',
+    label: 'Supabase',
+    icon: 'i-simple-icons:supabase',
     isDeployTarget: false,
     tokenPlaceholder: '',
   },
@@ -129,16 +149,27 @@ export function ConnectorsPanel() {
 
   // ---------- resource management (list / edit / delete) ----------
   // One provider's resource list is expanded at a time.
-  const [manageProvider, setManageProvider] = useState<ConnectorId | null>(null);
+  const [manageProvider, setManageProvider] = useState<ManageableId | null>(null);
   const [resLoading, setResLoading] = useState(false);
   const [resError, setResError] = useState<string | null>(null);
   const [resources, setResources] = useState<ConnectorResource[]>([]);
+
   // delete confirmation: two-step type-to-confirm (deletes real external resources)
   const [deleteTarget, setDeleteTarget] = useState<ConnectorResource | null>(null);
   const [confirmInput, setConfirmInput] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [busyResource, setBusyResource] = useState<string | null>(null); // per-row push busy marker
 
+  // ---------- Supabase (Management API OAuth) state ----------
+  const [sbConnected, setSbConnected] = useState(false);
+  const [sbEmail, setSbEmail] = useState<string | null>(null);
+  const [sbConnecting, setSbConnecting] = useState(false);
+  const [sbError, setSbError] = useState<string | null>(null);
+  const [sbLinked, setSbLinked] = useState<SupabaseLinkedProject | null>(null);
+  const [sbSchema, setSbSchema] = useState<SupabaseTable[] | null>(null);
+  const [sbSchemaLoading, setSbSchemaLoading] = useState(false);
+  const [sbSchemaBusy, setSbSchemaBusy] = useState(false);
+  const [sbSchemaError, setSbSchemaError] = useState<string | null>(null);
 
   // auto-scroll deploy log area
   useEffect(() => {
@@ -153,10 +184,12 @@ export function ConnectorsPanel() {
 
   // refresh all connection statuses from the session's server-side KV (bolt_session)
   const refreshStatuses = () => {
-    getGitHubConnection().then((conn) => {
-      setGhConnected(conn.hasToken);
-      setGhLogin(conn.login);
-    });
+    getGitHubConnection()
+      .then((conn) => {
+        setGhConnected(conn.hasToken);
+        setGhLogin(conn.login);
+      })
+      .catch(() => undefined);
 
     const providers: DeployProvider[] = ['vercel', 'netlify', 'cloudflare'];
 
@@ -165,6 +198,16 @@ export function ConnectorsPanel() {
         setProviderState(provider, { connected: !!token });
       });
     }
+
+    getSupabaseConnection()
+      .then((conn) => {
+        setSbConnected(conn.connected);
+        setSbEmail(conn.email);
+      })
+      .catch(() => undefined);
+    getLinkedSupabaseProject()
+      .then(setSbLinked)
+      .catch(() => undefined);
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -268,7 +311,7 @@ export function ConnectorsPanel() {
 
   // ---------- resource management handlers (list / edit / delete) ----------
 
-  const loadResources = async (provider: ConnectorId) => {
+  const loadResources = async (provider: ManageableId) => {
     setManageProvider(provider);
     setResLoading(true);
     setResError(null);
@@ -285,7 +328,7 @@ export function ConnectorsPanel() {
     }
   };
 
-  const toggleManage = (provider: ConnectorId) => {
+  const toggleManage = (provider: ManageableId) => {
     if (manageProvider === provider) {
       setManageProvider(null);
       setDeleteTarget(null);
@@ -353,6 +396,7 @@ export function ConnectorsPanel() {
 
           setDeployError(pollErr?.message ?? 'Deployment polling failed');
           setDeployStatus(null);
+
           return;
         }
       }
@@ -411,6 +455,13 @@ export function ConnectorsPanel() {
         confirmName: confirmInput,
       });
       toast.success(`Deleted ${resource.name}`);
+
+      // if the deleted supabase project was the linked one, clear link state
+      if (manageProvider === 'supabase' && sbLinked?.ref === resource.id) {
+        setSbLinked(null);
+        setSbSchema(null);
+      }
+
       setDeleteTarget(null);
       setConfirmInput('');
       await loadResources(manageProvider);
@@ -420,7 +471,6 @@ export function ConnectorsPanel() {
       setDeleting(false);
     }
   };
-
 
   const handleDeploy = async (provider: DeployProvider) => {
     setDeployError(null);
@@ -643,8 +693,104 @@ export function ConnectorsPanel() {
     );
   };
 
+  // ---------- Supabase (Management API OAuth) handlers ----------
+
+  const handleConnectSupabase = async () => {
+    setSbError(null);
+    setSbConnecting(true);
+
+    try {
+      await connectSupabase();
+
+      const conn = await getSupabaseConnection();
+      setSbConnected(conn.connected);
+      setSbEmail(conn.email);
+
+      if (conn.connected) {
+        toast.success(conn.email ? `Connected to Supabase as ${conn.email}` : 'Connected to Supabase');
+      }
+    } catch (e: any) {
+      setSbError(e?.message ?? 'Failed to connect Supabase account');
+    } finally {
+      setSbConnecting(false);
+    }
+  };
+
+  const handleDisconnectSupabase = async () => {
+    setSbError(null);
+
+    try {
+      await disconnectSupabase();
+      setSbConnected(false);
+      setSbEmail(null);
+      setSbLinked(null);
+      setSbSchema(null);
+      toast.success('Disconnected Supabase account');
+    } catch (e: any) {
+      setSbError(e?.message ?? 'Failed to disconnect');
+    }
+  };
+
+  /** Link an existing project (from the resource list) to the current session. */
+  const handleLinkSupabaseProject = async (resource: ConnectorResource) => {
+    setSbSchemaError(null);
+
+    try {
+      const linked = await linkSupabaseProject(resource.id);
+      setSbLinked(linked);
+      toast.success(`Linked project ${linked.name}`);
+    } catch (e: any) {
+      setSbSchemaError(e?.message ?? 'Failed to link project');
+    }
+  };
+
+  const handleLoadSchema = async () => {
+    if (!sbLinked) {
+      return;
+    }
+
+    setSbSchemaLoading(true);
+    setSbSchemaError(null);
+
+    try {
+      setSbSchema(await getSupabaseSchema());
+    } catch (e: any) {
+      setSbSchemaError(e?.message ?? 'Failed to load schema');
+      setSbSchema(null);
+    } finally {
+      setSbSchemaLoading(false);
+    }
+  };
+
+  const handleSchemaOp = async (payload: Parameters<typeof applySupabaseSchemaOp>[0]) => {
+    setSbSchemaBusy(true);
+    setSbSchemaError(null);
+
+    try {
+      await applySupabaseSchemaOp(payload);
+      await handleLoadSchema();
+    } catch (e: any) {
+      setSbSchemaError(e?.message ?? 'Schema edit failed');
+    } finally {
+      setSbSchemaBusy(false);
+    }
+  };
+
+  const handleUnlinkSupabaseProject = async () => {
+    setSbSchemaError(null);
+
+    try {
+      await unlinkSupabaseProject();
+      setSbLinked(null);
+      setSbSchema(null);
+      toast.success('Unlinked project');
+    } catch (e: any) {
+      setSbSchemaError(e?.message ?? 'Failed to unlink');
+    }
+  };
+
   /** Shared resource list UI (rendered inside a connected connector's row). */
-  const renderResourceSection = (provider: ConnectorId, label: string) => {
+  const renderResourceSection = (provider: ManageableId, label: string) => {
     if (manageProvider !== provider) {
       return null;
     }
@@ -688,7 +834,10 @@ export function ConnectorsPanel() {
         )}
 
         {resources.map((r) => (
-          <div key={`${provider}-${r.id}`} className="space-y-1.5 rounded border border-[#242424] bg-[#101010] px-2 py-1.5">
+          <div
+            key={`${provider}-${r.id}`}
+            className="space-y-1.5 rounded border border-[#242424] bg-[#101010] px-2 py-1.5"
+          >
             <div className="flex items-center justify-between gap-2">
               {r.url ? (
                 <a
@@ -710,8 +859,8 @@ export function ConnectorsPanel() {
             {deleteTarget?.id === r.id ? (
               <div className="space-y-1.5 rounded border border-[#e5484d]/40 bg-[#e5484d]/5 p-2">
                 <p className="text-[10px] leading-relaxed text-[#ff9a9e]">
-                  This permanently deletes <strong className="text-[#e8e8e8]">{r.name}</strong> from {label}. This cannot
-                  be undone. Type the resource name to confirm:
+                  This permanently deletes <strong className="text-[#e8e8e8]">{r.name}</strong> from {label}. This
+                  cannot be undone. Type the resource name to confirm:
                 </p>
                 <input
                   value={confirmInput}
@@ -742,7 +891,7 @@ export function ConnectorsPanel() {
               </div>
             ) : (
               <div className="flex items-center justify-end gap-1.5">
-                {provider === 'github' ? (
+                {provider === 'github' && (
                   <button
                     onClick={() => handlePushToRepo(r)}
                     disabled={busyResource === r.id || deleting}
@@ -757,7 +906,21 @@ export function ConnectorsPanel() {
                     />
                     {busyResource === r.id ? 'Pushing…' : 'Push'}
                   </button>
-                ) : (
+                )}
+                {provider === 'supabase' && (
+                  <button
+                    onClick={() => handleLinkSupabaseProject(r)}
+                    disabled={sbLinked?.ref === r.id || sbSchemaBusy}
+                    className="inline-flex h-[24px] items-center gap-1 rounded-[6px] bg-[#242424] hover:bg-[#2e2e2e] disabled:opacity-50 px-2 text-[10px] font-medium text-[#e8e8e8] transition-colors"
+                    title={`Link the existing Supabase project "${r.name}" to this session`}
+                  >
+                    <div
+                      className={classNames(sbLinked?.ref === r.id ? 'i-ph:link-break' : 'i-ph:link', 'text-[10px]')}
+                    />
+                    {sbLinked?.ref === r.id ? 'Linked' : 'Link'}
+                  </button>
+                )}
+                {provider !== 'github' && provider !== 'supabase' && (
                   <button
                     onClick={() => handleEditResource(provider as DeployProvider, r)}
                     disabled={deployingProvider !== null || deleting}
@@ -783,11 +946,164 @@ export function ConnectorsPanel() {
           </div>
         ))}
 
+        {provider === 'supabase' && (
+          <div className="space-y-2 rounded border border-[#242424] bg-[#101010] px-2 py-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-[11px] font-medium text-[#e8e8e8]">
+                {sbLinked ? (
+                  <>
+                    Linked: <span className="text-[#7fc87f]">{sbLinked.name}</span>
+                    <span className="ml-1.5 text-[10px] text-[#5c5c5c]">({sbLinked.ref})</span>
+                  </>
+                ) : (
+                  <span className="text-[#8a8a8a]">No project linked to this session</span>
+                )}
+              </span>
+              {sbLinked && (
+                <button
+                  onClick={handleUnlinkSupabaseProject}
+                  disabled={sbSchemaBusy}
+                  className="shrink-0 inline-flex h-[22px] items-center rounded-[6px] border border-[#2a2a2a] bg-[#1c1c1c] hover:bg-[#242424] disabled:opacity-50 px-2 text-[10px] text-[#8a8a8a] transition-colors"
+                >
+                  Unlink
+                </button>
+              )}
+            </div>
+
+            {sbLinked && (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-[#8a8a8a]">Schema (public tables)</span>
+                  <div className="flex gap-1.5">
+                    {!sbSchema && (
+                      <button
+                        onClick={handleLoadSchema}
+                        disabled={sbSchemaLoading || sbSchemaBusy}
+                        className="inline-flex h-[22px] items-center gap-1 rounded-[6px] bg-[#242424] hover:bg-[#2e2e2e] disabled:opacity-50 px-2 text-[10px] font-medium text-[#e8e8e8] transition-colors"
+                      >
+                        <div
+                          className={classNames(
+                            sbSchemaLoading ? 'i-svg-spinners:90-ring-with-bg' : 'i-ph:table',
+                            'text-[10px]',
+                          )}
+                        />
+                        {sbSchemaLoading ? 'Loading…' : 'View schema'}
+                      </button>
+                    )}
+                    {sbSchema && (
+                      <button
+                        onClick={() => setSbSchema(null)}
+                        className="inline-flex h-[22px] items-center rounded-[6px] border border-[#2a2a2a] bg-[#1c1c1c] hover:bg-[#242424] px-2 text-[10px] text-[#8a8a8a] transition-colors"
+                      >
+                        Hide
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {sbSchemaError && <p className="text-[10px] text-[#ff9a9e]">{sbSchemaError}</p>}
+
+                {sbSchema?.map((table) => (
+                  <div key={table.name} className="rounded border border-[#242424] bg-[#0d0d0d] px-2 py-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <code className="text-[11px] text-[#7fc87f]">{table.name}</code>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Drop table "${table.name}"? This is irreversible and audit-logged.`)) {
+                            handleSchemaOp({ op: 'drop-table', table: table.name });
+                          }
+                        }}
+                        disabled={sbSchemaBusy}
+                        className="inline-flex h-[20px] items-center rounded border border-[#e5484d]/40 bg-transparent hover:bg-[#2a1a1a] disabled:opacity-50 px-1.5 text-[9px] font-medium text-[#ff9a9e] transition-colors"
+                      >
+                        Drop
+                      </button>
+                    </div>
+                    <div className="mt-1 space-y-0.5">
+                      {table.columns.map((col) => (
+                        <div key={col.name} className="flex items-center justify-between gap-2 text-[10px]">
+                          <span className="truncate text-[#e8e8e8]">
+                            {col.name}
+                            {!col.nullable && <span className="ml-1 text-[#5c5c5c]">NOT NULL</span>}
+                          </span>
+                          <span className="shrink-0 flex items-center gap-1.5">
+                            <span className="text-[#6b6bff]">{col.type}</span>
+                            <button
+                              onClick={() => {
+                                const newType = window.prompt(
+                                  `New type for "${col.name}" (e.g. text, integer, timestamptz)`,
+                                );
+
+                                if (newType) {
+                                  handleSchemaOp({
+                                    op: 'set-type',
+                                    table: table.name,
+                                    column: col.name,
+                                    type: newType,
+                                  });
+                                }
+                              }}
+                              disabled={sbSchemaBusy}
+                              className="text-[9px] text-[#5c5c5c] hover:text-[#e8e8e8] disabled:opacity-50"
+                              title="Change column type"
+                            >
+                              edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (
+                                  window.confirm(`Drop column "${table.name}.${col.name}"? Audit-logged, irreversible.`)
+                                ) {
+                                  handleSchemaOp({ op: 'drop-column', table: table.name, column: col.name });
+                                }
+                              }}
+                              disabled={sbSchemaBusy}
+                              className="text-[9px] text-[#5c5c5c] hover:text-[#ff9a9e] disabled:opacity-50"
+                              title="Drop column"
+                            >
+                              drop
+                            </button>
+                          </span>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => {
+                          const name = window.prompt('Column name:');
+
+                          if (!name) {
+                            return;
+                          }
+
+                          const type = window.prompt('Column type (e.g. text, integer, timestamptz):', 'text');
+
+                          if (!type) {
+                            return;
+                          }
+
+                          handleSchemaOp({ op: 'add-column', table: table.name, name, type });
+                        }}
+                        disabled={sbSchemaBusy}
+                        className="mt-1 inline-flex h-[20px] items-center gap-1 rounded-[4px] border border-[#2a2a2a] bg-[#1c1c1c] hover:bg-[#242424] disabled:opacity-50 px-1.5 text-[9px] text-[#8a8a8a] transition-colors"
+                      >
+                        <div className="i-ph:plus text-[9px]" />
+                        Add column
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <p className="text-[10px] leading-relaxed text-[#5c5c5c]">
+                  Destructive schema edits (drop column / drop table) are audit-logged server-side.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
         <p className="text-[10px] leading-relaxed text-[#5c5c5c]">
           Deletes are real and irreversible — they are logged server-side (provider, resource id, timestamp) for
           accountability.
         </p>
-
       </div>
     );
   };
@@ -894,6 +1210,80 @@ export function ConnectorsPanel() {
     </div>
   );
 
+  const renderSupabaseRow = () => (
+    <div className="space-y-2 border-b border-[#242424] px-2.5 py-3">
+      {/* status line */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-xs font-medium text-[#e8e8e8]">
+          <div className="i-simple-icons:supabase text-sm" />
+          Supabase
+        </span>
+        <span
+          className={classNames(
+            'flex items-center gap-1 text-[11px]',
+            sbConnected ? 'text-[#7fc87f]' : 'text-[#8a8a8a]',
+          )}
+        >
+          <div className={classNames('h-1.5 w-1.5 rounded-full', sbConnected ? 'bg-[#2a7a2a]' : 'bg-[#4a4a4a]')} />
+          {sbConnected ? `Connected${sbEmail ? ` as ${sbEmail}` : ''}` : 'Not connected'}
+        </span>
+      </div>
+
+      {sbError && <p className="text-[11px] text-[#ff9a9e]">{sbError}</p>}
+
+      {sbConnecting && (
+        <p className="flex items-center gap-2 text-[11px] text-[#8a8a8a]">
+          <div className="i-svg-spinners:90-ring-with-bg text-sm" />
+          Waiting for the Supabase OAuth popup…
+        </p>
+      )}
+
+      {/* action buttons */}
+      <div className="flex items-center justify-end gap-2">
+        {sbConnected && (
+          <button
+            onClick={() => toggleManage('supabase')}
+            className={classNames(
+              'inline-flex h-[26px] items-center gap-1 rounded-[6px] border px-2.5 text-[11px] font-medium transition-colors',
+              manageProvider === 'supabase'
+                ? 'border-[#6b6bff]/50 bg-[#6b6bff]/10 text-[#a3a3ff]'
+                : 'border-[#2a2a2a] bg-[#1c1c1c] text-[#e8e8e8] hover:bg-[#242424]',
+            )}
+          >
+            <div className="i-ph:list-dashes text-xs" />
+            Manage
+          </button>
+        )}
+        {sbConnected ? (
+          <button
+            onClick={handleDisconnectSupabase}
+            className="inline-flex h-[26px] items-center rounded-[6px] border border-[#e5484d]/40 bg-[#1c1c1c] hover:bg-[#2a1a1a] px-2.5 text-[11px] font-medium text-[#ff9a9e] transition-colors"
+          >
+            Disconnect
+          </button>
+        ) : (
+          !sbConnecting && (
+            <button
+              onClick={handleConnectSupabase}
+              className="inline-flex h-[26px] items-center gap-1.5 rounded-[6px] bg-[#3ecf8e] hover:bg-[#4fdb9a] px-3 text-[11px] font-medium text-[#0a1f16] transition-colors"
+            >
+              <div className="i-simple-icons:supabase text-xs" />
+              Connect
+            </button>
+          )
+        )}
+      </div>
+
+      {renderResourceSection('supabase', 'Supabase')}
+
+      <p className="text-[10px] leading-relaxed text-[#5c5c5c]">
+        Supabase Management API OAuth — token stored server-side, keyed to your{' '}
+        <code className="rounded bg-[#242424] px-1 py-0.5">bolt_session</code>. Link an existing project instead of
+        auto-provisioning one.
+      </p>
+    </div>
+  );
+
   return (
     <DropdownMenu.Root open={open} onOpenChange={handleOpenChange}>
       <DropdownMenu.Trigger asChild>
@@ -917,6 +1307,7 @@ export function ConnectorsPanel() {
         >
           <p className="px-2.5 pb-1 pt-1 text-[10px] font-medium uppercase tracking-wide text-[#5c5c5c]">Connectors</p>
           {renderGitHubRow()}
+          {renderSupabaseRow()}
           {CONNECTORS.filter((c) => c.isDeployTarget).map(renderDeployProviderRow)}
 
           {(deployingProvider || deployUrl || deployError) && (

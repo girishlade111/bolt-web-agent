@@ -71,7 +71,7 @@ export interface ConnectorResource {
   meta?: Record<string, string>;
 }
 
-export async function listConnectorResources(provider: 'github' | DeployProvider): Promise<ConnectorResource[]> {
+export async function listConnectorResources(provider: 'github' | 'supabase' | DeployProvider): Promise<ConnectorResource[]> {
   const res = await fetchWithSession(`/api/connectors/resources?provider=${encodeURIComponent(provider)}`);
   const data: any = await res.json().catch(() => ({}));
 
@@ -88,7 +88,7 @@ export async function listConnectorResources(provider: 'github' | DeployProvider
  * server-side (KV `audit:delete:*`) for accountability.
  */
 export async function deleteConnectorResource(opts: {
-  provider: 'github' | DeployProvider;
+  provider: 'github' | 'supabase' | DeployProvider;
   id: string;
   name: string;
   confirmName: string;

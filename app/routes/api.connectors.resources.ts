@@ -1,5 +1,6 @@
 import { json, type ActionFunctionArgs, type LoaderFunctionArgs } from '@remix-run/cloudflare';
 import { getSessionId, getEffectiveSessionId, createSessionCookie } from '~/lib/.server/rate-limiter';
+import { getSupabaseToken } from '~/lib/.server/supabase';
 
 /**
  * Connectors resource management API.
@@ -98,6 +99,13 @@ function sessionHeaders(sessionId: string, request: Request): Record<string, str
   return headers;
 }
 
+// getSupabaseToken: session-scoped Supabase Management API token (with refresh),
+// shared with /api/supabase/oauth and /api/supabase/project — see ~/lib/.server/supabase
+
+function supabaseHeaders(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
 // ---------------- list helpers (each provider's list-API) ----------------
 
 async function listGithubRepos(token: string): Promise<ResourceItem[]> {
@@ -181,6 +189,27 @@ async function listCloudflareProjects(token: string, accountId: string): Promise
   }));
 }
 
+async function listSupabaseProjects(token: string): Promise<ResourceItem[]> {
+  const res = await fetch('https://api.supabase.com/v1/projects', {
+    headers: supabaseHeaders(token),
+  });
+  const data: any = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new Error(data?.message ?? `Supabase project list failed: ${res.status}`);
+  }
+
+  return (Array.isArray(data) ? data : []).map((p: any) => ({
+    // resource id = project ref (what the Management API delete/query endpoints take)
+    id: String(p.ref ?? p.id),
+    name: String(p.name ?? p.ref),
+    kind: 'project' as const,
+    url: p.ref ? `https://supabase.com/dashboard/project/${p.ref}` : null,
+    updatedAt: p.created_at ?? p.updated_at ?? null,
+    meta: { ref: String(p.ref ?? ''), region: String(p.region ?? ''), organizationId: String(p.organization_id ?? '') },
+  }));
+}
+
 async function resolveCloudflareAccountId(token: string, storedAccountId?: string): Promise<string | null> {
   let accountId = storedAccountId;
 
@@ -245,6 +274,16 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
       }
 
       return json({ provider, resources: await listCloudflareProjects(stored.token, accountId) }, { headers });
+    }
+
+    if (provider === 'supabase') {
+      const token = await getSupabaseToken(env, sessionId);
+
+      if (!token) {
+        return json({ error: 'Supabase not connected' }, { status: 401, headers });
+      }
+
+      return json({ provider, resources: await listSupabaseProjects(token) }, { headers });
     }
 
     return json({ error: 'Unknown provider' }, { status: 400, headers });
@@ -384,6 +423,24 @@ export async function action({ request, context }: ActionFunctionArgs) {
           { error: data?.errors?.[0]?.message ?? `Cloudflare delete failed: ${res.status}` },
           { status: 502, headers },
         );
+      }
+    } else if (provider === 'supabase') {
+      const token = await getSupabaseToken(env, sessionId);
+
+      if (!token) {
+        return json({ error: 'Supabase not connected' }, { status: 401, headers });
+      }
+
+      // Management API delete is a soft delete (recoverable for a short window),
+      // but treat it as fully destructive in the audit trail.
+      const res = await fetch(`https://api.supabase.com/v1/projects/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: supabaseHeaders(token),
+      });
+
+      if (!res.ok && res.status !== 404) {
+        const data: any = await res.json().catch(() => ({}));
+        return json({ error: data?.message ?? `Supabase delete failed: ${res.status}` }, { status: 502, headers });
       }
     } else {
       return json({ error: 'Unknown provider' }, { status: 400, headers });
