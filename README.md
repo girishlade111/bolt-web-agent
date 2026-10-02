@@ -52,3 +52,11 @@ Bolt.new supports most popular JavaScript frameworks and libraries. If it runs o
 
 **How can I add make sure my framework/project works well in bolt?**  
 We are excited to work with the JavaScript ecosystem to improve functionality in Bolt. Reach out to us via [hello@stackblitz.com](mailto:hello@stackblitz.com) to discuss how we can partner!
+
+---
+
+## LS Build — fork by Girish Lade
+
+This repository is Girish Lade's fork of bolt.new, the no-code web app builder behind the **LS Build** product at LadeStack. Deployment target: Cloudflare Pages + Workers (`wrangler pages deploy`).
+
+Built and maintained by [Girish Lade](https://github.com/girishlade111) — a solo builder crafting free, practical software. Explore more projects at [ladestack.in](https://ladestack.in).
